@@ -1,0 +1,26 @@
+# Maven
+target/
+*.jar
+*.war
+*.class
+*.iml
+
+# IDE
+.idea/
+.vscode/
+*.project
+*.classpath
+.settings/
+
+# Spring Boot
+*.log
+logs/
+
+# Variables de entorno / secretos
+application-prod.properties
+application.properties
+.env
+
+# OS
+.DS_Store
+Thumbs.db
