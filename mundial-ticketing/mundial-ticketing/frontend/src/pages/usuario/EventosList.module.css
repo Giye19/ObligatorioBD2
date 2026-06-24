@@ -1,0 +1,58 @@
+.container {
+  padding: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #1a1a2e;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.2rem;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 1.2rem;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.equipos {
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.detalle {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.3rem;
+}
+
+.vacio {
+  text-align: center;
+  color: #888;
+  padding: 3rem;
+}
+
+.error {
+  background-color: #fde2e2;
+  color: #c0392b;
+  padding: 0.7rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}

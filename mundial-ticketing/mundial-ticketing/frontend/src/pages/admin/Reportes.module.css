@@ -1,0 +1,60 @@
+.container {
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #1a1a2e;
+}
+
+.section {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.sectionTitle {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: #1a1a2e;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.6rem;
+  border-bottom: 2px solid #eee;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.posicion {
+  font-weight: bold;
+  color: #1a1a2e;
+}
+
+.cantidad {
+  font-weight: bold;
+  color: #16a34a;
+}
+
+.vacio {
+  color: #888;
+  text-align: center;
+  padding: 1.5rem;
+}

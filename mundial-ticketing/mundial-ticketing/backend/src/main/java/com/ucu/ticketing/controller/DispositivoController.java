@@ -44,4 +44,18 @@ public class DispositivoController {
         dispositivoRepository.insert(dispositivo);
         return ResponseEntity.ok(dispositivo);
     }
+    @GetMapping("/mi-dispositivo")
+    @PreAuthorize("hasRole('FUNCIONARIO')")
+    public ResponseEntity<Dispositivo> miDispositivo(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal String mail) {
+
+        Dispositivo dispositivo = dispositivoRepository.findByFuncionario(mail);
+
+        if (dispositivo == null) {
+            throw new BusinessException(
+                    "No tiene un dispositivo asignado", HttpStatus.NOT_FOUND);
+        }
+
+        return ResponseEntity.ok(dispositivo);
+    }
 }

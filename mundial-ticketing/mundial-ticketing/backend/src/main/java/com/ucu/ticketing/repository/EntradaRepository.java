@@ -96,7 +96,7 @@ public class EntradaRepository {
     // una transferencia) e incrementa el contador de transferencias
     public void transferirPropietario(Integer idEntrada, String nuevoPropietario) {
         String sql = "update Entrada set mail_propietario = ?, " +
-                     "estado = 'TRANSFERIDA', cant_transferencias = cant_transferencias + 1 " +
+                     "estado = 'ACTIVA', cant_transferencias = cant_transferencias + 1 " +
                      "where id_entrada = ?";
         jdbc.update(sql, nuevoPropietario, idEntrada);
     }
