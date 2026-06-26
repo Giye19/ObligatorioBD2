@@ -50,7 +50,3 @@ App en http://localhost:5173
 | usuario@test.com | user123  | USUARIO |
 | func@test.com    | func123  | FUNCIONARIO |
 
-## Integrantes
-- [Nombre 1] — Base de datos
-- [Nombre 2] — Aplicación
-- [Nombre 3] — [Área]
