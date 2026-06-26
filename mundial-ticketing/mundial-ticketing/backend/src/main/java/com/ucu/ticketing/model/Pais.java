@@ -7,8 +7,8 @@ import lombok.AllArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Equipo {
+public class Pais {
 
-    private Long idEquipo;
-    private String nombre;
+    private Long idPais;
+    private String nombrePais;
 }

@@ -14,7 +14,7 @@ import java.util.List;
 public class VentaRequest {
 
     @NotNull(message = "El evento es obligatorio")
-    private Integer idEvento;
+    private Long idEvento;
 
     @NotEmpty(message = "Debe incluir al menos un item de compra")
     @Size(max = 5, message = "No se pueden incluir mas de 5 items distintos en una compra")

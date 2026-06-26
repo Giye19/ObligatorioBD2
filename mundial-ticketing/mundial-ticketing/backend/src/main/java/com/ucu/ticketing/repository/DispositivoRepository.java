@@ -3,13 +3,14 @@ package com.ucu.ticketing.repository;
 import com.ucu.ticketing.model.Dispositivo;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Dispositivo
-// cada dispositivo de escaneo debe estar vinculado a un
-// funcionario de validacion (relacion 1:1)
 @Repository
 public class DispositivoRepository {
 
@@ -21,35 +22,41 @@ public class DispositivoRepository {
 
     private final RowMapper<Dispositivo> rowMapper = (rs, rowNum) -> {
         Dispositivo d = new Dispositivo();
-        d.setIdDispositivo(rs.getString("id_dispositivo"));
-        d.setMailFuncionario(rs.getString("mail_funcionario"));
+        d.setIdDispositivo(rs.getLong("Id_Dispositivo"));
+        d.setIdFuncionario(rs.getLong("Id_Funcionario"));
+        d.setCodigoDispositivo(rs.getString("Codigo_Dispositivo"));
+        d.setActivo(rs.getBoolean("Activo"));
         return d;
     };
 
-    // busca un dispositivo por id, devuelve null si no existe
-    // o no esta autorizado (no esta en la tabla)
-    public Dispositivo findById(String idDispositivo) {
-        String sql = "select * from Dispositivo where id_dispositivo = ?";
-        List<Dispositivo> resultado = jdbc.query(sql, rowMapper, idDispositivo);
+    public Dispositivo findByCodigo(String codigoDispositivo) {
+        String sql = "select * from Dispositivo where Codigo_Dispositivo = ?";
+        List<Dispositivo> resultado = jdbc.query(sql, rowMapper, codigoDispositivo);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // verifica si un dispositivo esta autorizado (registrado)
-    // se usa como primer chequeo antes de cualquier validacion de acceso
-    public boolean estaAutorizado(String idDispositivo) {
-        return findById(idDispositivo) != null;
+    public boolean estaAutorizado(String codigoDispositivo) {
+        Dispositivo d = findByCodigo(codigoDispositivo);
+        return d != null && Boolean.TRUE.equals(d.getActivo());
     }
 
-    // busca el dispositivo vinculado a un funcionario especifico
-    public Dispositivo findByFuncionario(String mailFuncionario) {
-        String sql = "select * from Dispositivo where mail_funcionario = ?";
-        List<Dispositivo> resultado = jdbc.query(sql, rowMapper, mailFuncionario);
+    public Dispositivo findByFuncionario(Long idFuncionario) {
+        String sql = "select * from Dispositivo where Id_Funcionario = ?";
+        List<Dispositivo> resultado = jdbc.query(sql, rowMapper, idFuncionario);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // registra un nuevo dispositivo autorizado, vinculado a un funcionario
-    public void insert(Dispositivo dispositivo) {
-        String sql = "insert into Dispositivo (id_dispositivo, mail_funcionario) values (?, ?)";
-        jdbc.update(sql, dispositivo.getIdDispositivo(), dispositivo.getMailFuncionario());
+    public Long insert(Long idFuncionario, String codigoDispositivo) {
+        String sql = "insert into Dispositivo (Id_Funcionario, Codigo_Dispositivo) values (?, ?)";
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        jdbc.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, idFuncionario);
+            ps.setString(2, codigoDispositivo);
+            return ps;
+        }, keyHolder);
+
+        return keyHolder.getKey().longValue();
     }
 }

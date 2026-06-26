@@ -11,23 +11,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Manejo global de excepciones para toda la API.
- *
- * En vez de que cada Controller tenga try/catch, todas las
- * excepciones se centralizan acá. Devuelve siempre JSON con:
- *   - timestamp
- *   - status (código HTTP)
- *   - error (descripción)
- *   - message (detalle)
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Errores de validación de campos en DTOs (@Valid).
-     * Devuelve 400 con el detalle de qué campo falló.
-     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(
             MethodArgumentNotValidException ex) {
@@ -39,18 +25,37 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, "Error de validación", errors);
     }
 
-    /**
-     * Errores de lógica de negocio (reglas del dominio).
-     */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Map<String, Object>> handleBusiness(BusinessException ex) {
         return buildResponse(ex.getStatus(), "Error de negocio", ex.getMessage());
     }
 
-    /**
-     * Cualquier otra excepción no contemplada.
-     * Devuelve 500 para no exponer detalles internos.
-     */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleDataAccess(
+            org.springframework.dao.DataAccessException ex) {
+
+        Throwable causaRaiz = ex.getRootCause();
+
+        if (causaRaiz instanceof java.sql.SQLException sqlEx) {
+
+            if ("45000".equals(sqlEx.getSQLState())) {
+                return buildResponse(HttpStatus.CONFLICT, "Regla de negocio violada", sqlEx.getMessage());
+            }
+
+            if ("23000".equals(sqlEx.getSQLState())) {
+                return buildResponse(
+                        HttpStatus.CONFLICT,
+                        "Registro duplicado",
+                        "Ya existe un registro con esos mismos datos");
+            }
+        }
+
+        return buildResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Error de base de datos",
+                "Ocurrió un error al procesar la operación en la base de datos");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
         return buildResponse(

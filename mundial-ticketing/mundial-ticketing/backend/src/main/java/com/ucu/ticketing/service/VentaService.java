@@ -7,9 +7,13 @@ import com.ucu.ticketing.dto.response.VentaResponse;
 import com.ucu.ticketing.exception.BusinessException;
 import com.ucu.ticketing.model.Comision;
 import com.ucu.ticketing.model.Entrada;
+import com.ucu.ticketing.model.Equipo;
 import com.ucu.ticketing.model.Estadio;
 import com.ucu.ticketing.model.Evento;
+import com.ucu.ticketing.model.EventoSector;
 import com.ucu.ticketing.model.Sector;
+import com.ucu.ticketing.model.Usuario;
+import com.ucu.ticketing.model.UsuarioGeneral;
 import com.ucu.ticketing.model.Venta;
 import com.ucu.ticketing.repository.*;
 import org.springframework.http.HttpStatus;
@@ -18,85 +22,89 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-// contiene la logica de compra de entradas
-// valida limite de 5 entradas por transaccion, disponibilidad
-// de cada sector, y calcula el monto total con comision vigente
 @Service
 public class VentaService {
-
-    // cantidad maxima de entradas permitidas en una sola transaccion,
-    // segun la consigna: "un usuario no puede comprar mas de 5
-    // entradas en la misma transaccion"
-    private static final int MAXIMO_ENTRADAS_POR_VENTA = 5;
 
     private final VentaRepository ventaRepository;
     private final EntradaRepository entradaRepository;
     private final ComisionRepository comisionRepository;
     private final EventoRepository eventoRepository;
+    private final EventoSectorRepository eventoSectorRepository;
     private final SectorRepository sectorRepository;
     private final EstadioRepository estadioRepository;
+    private final EquipoRepository equipoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final UsuarioGeneralRepository usuarioGeneralRepository;
+    private final TransferenciaRepository transferenciaRepository;
 
     public VentaService(VentaRepository ventaRepository,
                          EntradaRepository entradaRepository,
                          ComisionRepository comisionRepository,
                          EventoRepository eventoRepository,
+                         EventoSectorRepository eventoSectorRepository,
                          SectorRepository sectorRepository,
-                         EstadioRepository estadioRepository) {
+                         EstadioRepository estadioRepository,
+                         EquipoRepository equipoRepository,
+                         UsuarioRepository usuarioRepository,
+                         UsuarioGeneralRepository usuarioGeneralRepository,
+                         TransferenciaRepository transferenciaRepository) {
         this.ventaRepository = ventaRepository;
         this.entradaRepository = entradaRepository;
         this.comisionRepository = comisionRepository;
         this.eventoRepository = eventoRepository;
+        this.eventoSectorRepository = eventoSectorRepository;
         this.sectorRepository = sectorRepository;
         this.estadioRepository = estadioRepository;
+        this.equipoRepository = equipoRepository;
+        this.usuarioRepository = usuarioRepository;
+        this.usuarioGeneralRepository = usuarioGeneralRepository;
+        this.transferenciaRepository = transferenciaRepository;
     }
 
-    // realiza una compra de entradas para un evento
-    // toda la operacion es transaccional: si falla cualquier paso,
-    // se deshacen todos los inserts hechos hasta ese momento
     @Transactional
     public VentaResponse comprar(VentaRequest request, String mailComprador) {
 
-        // valida que el evento exista
+        Usuario usuario = usuarioRepository.findByMail(mailComprador);
+        if (usuario == null) {
+            throw new BusinessException("El usuario no existe", HttpStatus.UNAUTHORIZED);
+        }
+
+        UsuarioGeneral usuarioGeneral = usuarioGeneralRepository.findByIdUsuario(usuario.getIdUsuario());
+        if (usuarioGeneral == null) {
+            throw new BusinessException("El usuario no es un usuario general", HttpStatus.FORBIDDEN);
+        }
+
         Evento evento = eventoRepository.findById(request.getIdEvento());
         if (evento == null) {
             throw new BusinessException("El evento no existe", HttpStatus.BAD_REQUEST);
         }
 
-        // suma la cantidad total de entradas pedidas en todos los items
         int cantidadTotal = request.getItemsEntrada().stream()
                 .mapToInt(ItemEntradaRequest::getCantidad)
                 .sum();
-
-        if (cantidadTotal > MAXIMO_ENTRADAS_POR_VENTA) {
-            throw new BusinessException(
-                    "No se pueden comprar mas de " + MAXIMO_ENTRADAS_POR_VENTA +
-                            " entradas en la misma transaccion",
-                    HttpStatus.BAD_REQUEST);
-        }
 
         if (cantidadTotal == 0) {
             throw new BusinessException("Debe solicitar al menos una entrada", HttpStatus.BAD_REQUEST);
         }
 
-        // valida cada item: que el sector este habilitado para el evento
-        // y que haya disponibilidad suficiente
+        List<EventoSector> eventoSectores = new ArrayList<>();
         for (ItemEntradaRequest item : request.getItemsEntrada()) {
-            validarDisponibilidad(evento, item);
+            EventoSector es = validarDisponibilidad(evento, item);
+            eventoSectores.add(es);
         }
 
-        // calcula el costo total de las entradas (sin comision todavia)
         BigDecimal costoEntradas = BigDecimal.ZERO;
-        for (ItemEntradaRequest item : request.getItemsEntrada()) {
-            BigDecimal costoSector = eventoRepository.findCostoEntrada(
-                    evento.getIdEvento(), evento.getIdEstadio(), item.getLetraSector());
-            costoEntradas = costoEntradas.add(costoSector.multiply(BigDecimal.valueOf(item.getCantidad())));
+        for (int i = 0; i < request.getItemsEntrada().size(); i++) {
+            ItemEntradaRequest item = request.getItemsEntrada().get(i);
+            EventoSector es = eventoSectores.get(i);
+            costoEntradas = costoEntradas.add(es.getCostoEntrada().multiply(BigDecimal.valueOf(item.getCantidad())));
         }
 
-        // busca la comision vigente y calcula el monto total
         Comision comisionVigente = comisionRepository.findVigente();
         if (comisionVigente == null) {
             throw new BusinessException("No hay una comision vigente configurada", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -104,93 +112,91 @@ public class VentaService {
 
         BigDecimal montoComision = costoEntradas
                 .multiply(comisionVigente.getPorcentaje())
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                .setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal montoTotal = costoEntradas.add(montoComision);
 
-        // crea la venta
         Venta venta = new Venta();
-        venta.setMailComprador(mailComprador);
+        venta.setIdUsuarioGeneral(usuarioGeneral.getIdUsuarioGeneral());
         venta.setIdComision(comisionVigente.getIdComision());
-        venta.setEstado("PAGA"); // simplificacion para el demo: se confirma directo
+        venta.setFechaVenta(LocalDateTime.now());
+        venta.setEstadoVenta("PAGA");
         venta.setMontoTotal(montoTotal);
-        venta.setFechaVenta(java.time.LocalDateTime.now());
-        
-        Integer idVenta = ventaRepository.insert(venta);
-        venta.setIdVenta(idVenta);
 
-        // crea una entrada individual por cada unidad solicitada en cada item
-        // cada entrada tiene su propio id, aunque pertenezcan a la misma venta
+        Long idVenta = ventaRepository.insert(venta);
+
         List<Entrada> entradasCreadas = new ArrayList<>();
 
-        for (ItemEntradaRequest item : request.getItemsEntrada()) {
-            BigDecimal costoSector = eventoRepository.findCostoEntrada(
-                    evento.getIdEvento(), evento.getIdEstadio(), item.getLetraSector());
+        for (int i = 0; i < request.getItemsEntrada().size(); i++) {
+            ItemEntradaRequest item = request.getItemsEntrada().get(i);
+            EventoSector es = eventoSectores.get(i);
 
-            for (int i = 0; i < item.getCantidad(); i++) {
+            for (int j = 0; j < item.getCantidad(); j++) {
                 Entrada entrada = new Entrada();
+                entrada.setIdEventoSector(es.getIdEventoSector());
                 entrada.setIdVenta(idVenta);
-                entrada.setIdEvento(evento.getIdEvento());
-                entrada.setIdEstadio(evento.getIdEstadio());
-                entrada.setLetraSector(item.getLetraSector());
-                entrada.setMailPropietario(mailComprador);
-                entrada.setCostoEntrada(costoSector);
+                entrada.setIdPropietarioActual(usuarioGeneral.getIdUsuarioGeneral());
+                entrada.setCostoEntrada(es.getCostoEntrada());
 
-                Integer idEntrada = entradaRepository.insert(entrada);
+                Long idEntrada = entradaRepository.insert(entrada);
                 entrada.setIdEntrada(idEntrada);
-                entrada.setEstado("ACTIVA");
-                entrada.setCantTransferencias(0);
+                entrada.setEstadoEntrada("NO_CONSUMIDA");
 
                 entradasCreadas.add(entrada);
             }
         }
 
-        return toResponse(venta, comisionVigente.getPorcentaje(), entradasCreadas, evento);
+        Venta ventaCreada = ventaRepository.findById(idVenta);
+        return toResponse(ventaCreada, comisionVigente.getPorcentaje(), entradasCreadas, evento);
     }
 
-    // valida que el sector este habilitado para el evento y que
-    // haya disponibilidad suficiente para la cantidad solicitada
-    // actua como limite duro de capacidad, segun la consigna
-    private void validarDisponibilidad(Evento evento, ItemEntradaRequest item) {
+    private EventoSector validarDisponibilidad(Evento evento, ItemEntradaRequest item) {
 
-        boolean sectorHabilitado = eventoRepository.sectorHabilitado(
-                evento.getIdEvento(), evento.getIdEstadio(), item.getLetraSector());
+        Sector sector = sectorRepository.findByEstadioYLetra(evento.getIdEstadio(), item.getLetraSector());
+        if (sector == null) {
+            throw new BusinessException(
+                    "El sector " + item.getLetraSector() + " no existe en el estadio", HttpStatus.BAD_REQUEST);
+        }
 
-        if (!sectorHabilitado) {
+        EventoSector eventoSector = eventoSectorRepository.findByEventoYSector(
+                evento.getIdEvento(), sector.getIdSector());
+
+        if (eventoSector == null) {
             throw new BusinessException(
                     "El sector " + item.getLetraSector() + " no esta habilitado para este evento",
                     HttpStatus.BAD_REQUEST);
         }
 
-        Sector sector = sectorRepository.findByEstadioYLetra(evento.getIdEstadio(), item.getLetraSector());
-        int vendidas = entradaRepository.countEntradasVendidas(
-                evento.getIdEvento(), evento.getIdEstadio(), item.getLetraSector());
-
-        int disponibles = sector.getCapacidad() - vendidas;
-
-        if (item.getCantidad() > disponibles) {
-            throw new BusinessException(
-                    "No hay suficiente disponibilidad en el sector " + item.getLetraSector() +
-                            ". Disponibles: " + disponibles,
-                    HttpStatus.CONFLICT);
-        }
+        return eventoSector;
     }
 
-    // devuelve el historico de ventas de un usuario
     public List<VentaResponse> findByComprador(String mailComprador) {
-        return ventaRepository.findByComprador(mailComprador).stream()
+        Usuario usuario = usuarioRepository.findByMail(mailComprador);
+        if (usuario == null) {
+            throw new BusinessException("El usuario no existe", HttpStatus.UNAUTHORIZED);
+        }
+
+        UsuarioGeneral usuarioGeneral = usuarioGeneralRepository.findByIdUsuario(usuario.getIdUsuario());
+        if (usuarioGeneral == null) {
+            return List.of();
+        }
+
+        return ventaRepository.findByUsuarioGeneral(usuarioGeneral.getIdUsuarioGeneral()).stream()
                 .map(venta -> {
                     Comision comision = comisionRepository.findById(venta.getIdComision());
                     List<Entrada> entradas = entradaRepository.findByVenta(venta.getIdVenta());
-                    Evento evento = entradas.isEmpty() ? null :
-                            eventoRepository.findById(entradas.get(0).getIdEvento());
+
+                    Evento evento = null;
+                    if (!entradas.isEmpty()) {
+                        EventoSector es = eventoSectorRepository.findById(entradas.get(0).getIdEventoSector());
+                        evento = eventoRepository.findById(es.getIdEvento());
+                    }
 
                     return toResponse(venta, comision.getPorcentaje(), entradas, evento);
                 })
                 .collect(Collectors.toList());
     }
 
-    // convierte el modelo interno a dto de salida
     private VentaResponse toResponse(Venta venta, BigDecimal porcentajeComision,
                                       List<Entrada> entradas, Evento evento) {
 
@@ -198,44 +204,56 @@ public class VentaService {
                 .map(e -> toEntradaResponse(e, evento))
                 .collect(Collectors.toList());
 
+        String mailComprador = resolverMailComprador(venta.getIdUsuarioGeneral());
+
         return new VentaResponse(
                 venta.getIdVenta(),
-                venta.getMailComprador(),
+                mailComprador,
                 venta.getFechaVenta(),
-                venta.getEstado(),
+                venta.getEstadoVenta(),
                 venta.getMontoTotal(),
                 porcentajeComision,
                 entradasResponse);
     }
 
-    // convierte una entrada a su dto de salida, agregando datos
-    // legibles del evento y estadio
+    private String resolverMailComprador(Long idUsuarioGeneral) {
+        Long idUsuario = usuarioGeneralRepository.findIdUsuarioById(idUsuarioGeneral);
+        if (idUsuario == null) {
+            return null;
+        }
+        Usuario usuario = usuarioRepository.findById(idUsuario);
+        return usuario != null ? usuario.getMail() : null;
+    }
+
     private EntradaResponse toEntradaResponse(Entrada entrada, Evento evento) {
-        Estadio estadio = estadioRepository.findById(entrada.getIdEstadio());
+        EventoSector eventoSector = eventoSectorRepository.findById(entrada.getIdEventoSector());
+
+        Estadio estadio = evento != null ? estadioRepository.findById(evento.getIdEstadio()) : null;
 
         String equipoLocal = null;
         String equipoVisitante = null;
         if (evento != null) {
-            List<Object[]> equiposRaw = eventoRepository.findEquiposByEvento(evento.getIdEvento());
-            for (Object[] fila : equiposRaw) {
-                if ("LOCAL".equals(fila[1])) {
-                    equipoLocal = (String) fila[0];
-                } else {
-                    equipoVisitante = (String) fila[0];
-                }
-            }
+            Equipo local = equipoRepository.findById(evento.getIdEquipoLocal());
+            Equipo visitante = equipoRepository.findById(evento.getIdEquipoVisitante());
+            equipoLocal = local != null ? local.getNombre() : null;
+            equipoVisitante = visitante != null ? visitante.getNombre() : null;
         }
+
+        int cantTransferencias = transferenciaRepository.findByEntrada(entrada.getIdEntrada()).stream()
+                .filter(t -> "ACEPTADA".equals(t.getEstadoTransferencia()))
+                .toList()
+                .size();
 
         return new EntradaResponse(
                 entrada.getIdEntrada(),
-                entrada.getIdEvento(),
-                estadio != null ? estadio.getNombre() : null,
+                evento != null ? evento.getIdEvento() : null,
+                estadio != null ? estadio.getNombreEstadio() : null,
                 equipoLocal,
                 equipoVisitante,
-                entrada.getLetraSector(),
-                entrada.getMailPropietario(),
-                entrada.getEstado(),
+                eventoSector != null ? eventoSector.getLetraSector() : null,
+                null,
+                entrada.getEstadoEntrada(),
                 entrada.getCostoEntrada(),
-                entrada.getCantTransferencias());
+                cantTransferencias);
     }
 }

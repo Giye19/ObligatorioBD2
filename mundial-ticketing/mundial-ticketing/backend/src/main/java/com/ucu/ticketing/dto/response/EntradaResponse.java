@@ -13,8 +13,8 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class EntradaResponse {
 
-    private Integer idEntrada;
-    private Integer idEvento;
+    private Long idEntrada;
+    private Long idEvento;
     private String nombreEstadio;
     private String equipoLocal;
     private String equipoVisitante;

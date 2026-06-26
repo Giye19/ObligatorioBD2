@@ -12,7 +12,6 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Venta
 @Repository
 public class VentaRepository {
 
@@ -24,67 +23,53 @@ public class VentaRepository {
 
     private final RowMapper<Venta> rowMapper = (rs, rowNum) -> {
         Venta v = new Venta();
-        v.setIdVenta(rs.getInt("id_venta"));
-        v.setMailComprador(rs.getString("mail_comprador"));
-        v.setIdComision(rs.getInt("id_comision"));
-        v.setFechaVenta(rs.getTimestamp("fecha_venta").toLocalDateTime());
-        v.setEstado(rs.getString("estado"));
-        v.setMontoTotal(rs.getBigDecimal("monto_total"));
+        v.setIdVenta(rs.getLong("Id_Venta"));
+        v.setIdUsuarioGeneral(rs.getLong("Id_Usuario_General"));
+        v.setIdComision(rs.getLong("Id_Comision"));
+        v.setFechaVenta(rs.getTimestamp("Fecha_Venta").toLocalDateTime());
+        v.setEstadoVenta(rs.getString("Estado_Venta"));
+        v.setMontoTotal(rs.getBigDecimal("Monto_Total"));
         return v;
     };
 
-    // busca una venta por id, devuelve null si no existe
-    public Venta findById(Integer idVenta) {
-        String sql = "select * from Venta where id_venta = ?";
+    public Venta findById(Long idVenta) {
+        String sql = "select * from Venta where Id_Venta = ?";
         List<Venta> resultado = jdbc.query(sql, rowMapper, idVenta);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // devuelve todas las ventas realizadas por un usuario,
-    // ordenadas de la mas reciente a la mas antigua
-    // se usa en "ver mis compras"
-    public List<Venta> findByComprador(String mailComprador) {
-        String sql = "select * from Venta where mail_comprador = ? order by fecha_venta desc";
-        return jdbc.query(sql, rowMapper, mailComprador);
+    public List<Venta> findByUsuarioGeneral(Long idUsuarioGeneral) {
+        String sql = "select * from Venta where Id_Usuario_General = ? order by Fecha_Venta desc";
+        return jdbc.query(sql, rowMapper, idUsuarioGeneral);
     }
 
-    // inserta una nueva venta y devuelve el id autogenerado
-    public Integer insert(Venta venta) {
-        String sql = "insert into Venta (mail_comprador, id_comision, fecha_venta, estado, monto_total) " +
+    public Long insert(Venta venta) {
+        String sql = "insert into Venta (Id_Usuario_General, Id_Comision, Fecha_Venta, Estado_Venta, Monto_Total) " +
                      "values (?, ?, ?, ?, ?)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, venta.getMailComprador());
-            ps.setInt(2, venta.getIdComision());
+            ps.setLong(1, venta.getIdUsuarioGeneral());
+            ps.setLong(2, venta.getIdComision());
             ps.setTimestamp(3, Timestamp.valueOf(venta.getFechaVenta()));
-            ps.setString(4, venta.getEstado());
+            ps.setString(4, venta.getEstadoVenta());
             ps.setBigDecimal(5, venta.getMontoTotal());
             return ps;
         }, keyHolder);
 
-        return keyHolder.getKey().intValue();
+        return keyHolder.getKey().longValue();
     }
 
-    // actualiza el estado de una venta (pendiente -> confirmada -> paga)
-    public void updateEstado(Integer idVenta, String nuevoEstado) {
-        String sql = "update Venta set estado = ? where id_venta = ?";
-        jdbc.update(sql, nuevoEstado, idVenta);
-    }
-
-    // devuelve el ranking de usuarios con mas entradas compradas
-    // (mayores compradores), limitado a una cantidad maxima
-    // se usa para la funcionalidad de reportes/estadisticas
     public List<Object[]> findRankingCompradores(int limite) {
-        String sql = "select v.mail_comprador, count(e.id_entrada) as cantidad " +
+        String sql = "select v.Id_Usuario_General, count(e.Id_Entrada) as cantidad " +
                      "from Venta v " +
-                     "join Entrada e on e.id_venta = v.id_venta " +
-                     "group by v.mail_comprador " +
+                     "join Entrada e on e.Id_Venta = v.Id_Venta " +
+                     "group by v.Id_Usuario_General " +
                      "order by cantidad desc " +
                      "limit ?";
         return jdbc.query(sql, (rs, rowNum) ->
-                new Object[]{rs.getString("mail_comprador"), rs.getInt("cantidad")},
+                new Object[]{rs.getLong("Id_Usuario_General"), rs.getInt("cantidad")},
                 limite);
     }
 }

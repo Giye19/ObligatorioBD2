@@ -31,6 +31,7 @@ export default function Navbar() {
           <>
             <Link to="/admin/estadios">Estadios</Link>
             <Link to="/admin/eventos">Eventos</Link>
+            <Link to="/admin/dispositivos">Dispositivos</Link>
             <Link to="/admin/reportes">Reportes</Link>
           </>
         )}

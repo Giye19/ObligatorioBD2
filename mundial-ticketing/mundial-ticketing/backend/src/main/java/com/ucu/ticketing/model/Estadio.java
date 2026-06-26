@@ -6,17 +6,16 @@ import lombok.AllArgsConstructor;
 
 import java.util.List;
 
-//tabla estadio
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Estadio {
 
-    private Integer idEstadio;
-    private String nombre;
-    private String nombrePais;     // FK a Pais_Sede
+    private Long idEstadio;
+    private String nombreEstadio;
+    private Long idPaisSede;
+    private String nombrePais;
+    private Long idDireccion;
 
-   
     private List<Sector> sectores;
 }

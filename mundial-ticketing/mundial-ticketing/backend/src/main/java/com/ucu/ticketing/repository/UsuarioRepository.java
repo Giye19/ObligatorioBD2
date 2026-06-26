@@ -3,13 +3,14 @@ package com.ucu.ticketing.repository;
 import com.ucu.ticketing.model.Usuario;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Usuario y su tabla
-// hija Usuario_Telefono (multivaluada)
 @Repository
 public class UsuarioRepository {
 
@@ -19,109 +20,87 @@ public class UsuarioRepository {
         this.jdbc = jdbc;
     }
 
-    // mapea una fila de Usuario a un objeto Usuario
-    // no carga los telefonos aca, eso se hace aparte porque
-    // viven en otra tabla (evita duplicar filas con un join)
-    private final RowMapper<Usuario> usuarioRowMapper = (rs, rowNum) -> {
+    private final RowMapper<Usuario> rowMapper = (rs, rowNum) -> {
         Usuario u = new Usuario();
-        u.setMail(rs.getString("mail"));
-        u.setPassword(rs.getString("password"));
-        u.setRol(rs.getString("rol"));
-        u.setDocPais(rs.getString("doc_pais"));
-        u.setDocTipo(rs.getString("doc_tipo"));
-        u.setDocNumero(rs.getString("doc_numero"));
-        u.setDirPais(rs.getString("dir_pais"));
-        u.setDirLocalidad(rs.getString("dir_localidad"));
-        u.setDirCalle(rs.getString("dir_calle"));
-        u.setDirNumero(rs.getString("dir_numero"));
-        u.setDirCodPostal(rs.getString("dir_cod_postal"));
+        u.setIdUsuario(rs.getLong("Id_Usuario"));
+        u.setIdDocumento(rs.getLong("Id_Documento"));
+        u.setIdDireccion(rs.getLong("Id_Direccion"));
+        u.setMail(rs.getString("Mail"));
+        u.setPassword(rs.getString("Contrasena"));
+        u.setNombre(rs.getString("Nombre"));
+        u.setApellido(rs.getString("Apellido"));
+        u.setFechaCreacion(rs.getTimestamp("Fecha_Creacion").toLocalDateTime());
         return u;
     };
 
-    // busca un usuario por mail, sin cargar telefonos
-    // devuelve null si no existe
     public Usuario findByMail(String mail) {
-        String sql = "select * from Usuario where mail = ?";
-        List<Usuario> resultado = jdbc.query(sql, usuarioRowMapper, mail);
+        String sql = "select * from Usuario where Mail = ?";
+        List<Usuario> resultado = jdbc.query(sql, rowMapper, mail);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // busca un usuario por mail y le carga la lista de telefonos
-    // se usa cuando se necesita el objeto completo, ej: para
-    // armar el UsuarioResponse del perfil
-    public Usuario findByMailConTelefonos(String mail) {
-        Usuario usuario = findByMail(mail);
-        if (usuario != null) {
-            usuario.setTelefonos(findTelefonosByMail(mail));
-        }
-        return usuario;
+    public Usuario findById(Long idUsuario) {
+        String sql = "select * from Usuario where Id_Usuario = ?";
+        List<Usuario> resultado = jdbc.query(sql, rowMapper, idUsuario);
+        return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // verifica si ya existe un usuario con ese mail
-    // se usa antes de registrar, para no violar la pk
     public boolean existsByMail(String mail) {
-        String sql = "select count(*) from Usuario where mail = ?";
+        String sql = "select count(*) from Usuario where Mail = ?";
         Integer count = jdbc.queryForObject(sql, Integer.class, mail);
         return count != null && count > 0;
     }
 
-    // verifica si ya existe un usuario con ese documento
-    // (pais + tipo + numero), ya que el documento es unico
-    public boolean existsByDocumento(String docPais, String docTipo, String docNumero) {
-        String sql = "select count(*) from Usuario " +
-                     "where doc_pais = ? and doc_tipo = ? and doc_numero = ?";
-        Integer count = jdbc.queryForObject(sql, Integer.class, docPais, docTipo, docNumero);
-        return count != null && count > 0;
+    public Long insert(Usuario usuario) {
+        String sql = "insert into Usuario (Id_Documento, Id_Direccion, Mail, Contrasena, Nombre, Apellido) " +
+                     "values (?, ?, ?, ?, ?, ?)";
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        jdbc.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, usuario.getIdDocumento());
+            ps.setLong(2, usuario.getIdDireccion());
+            ps.setString(3, usuario.getMail());
+            ps.setString(4, usuario.getPassword());
+            ps.setString(5, usuario.getNombre());
+            ps.setString(6, usuario.getApellido());
+            return ps;
+        }, keyHolder);
+
+        return keyHolder.getKey().longValue();
     }
 
-    // inserta un nuevo usuario base (sin telefonos todavia)
-    // el password que llega aca ya debe venir hasheado con bcrypt,
-    // el hash se hace en el service, no en el repository
-    public void insert(Usuario usuario) {
-        String sql = "insert into Usuario " +
-                     "(mail, password, rol, doc_pais, doc_tipo, doc_numero, " +
-                     " dir_pais, dir_localidad, dir_calle, dir_numero, dir_cod_postal) " +
-                     "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        jdbc.update(sql,
-                usuario.getMail(),
-                usuario.getPassword(),
-                usuario.getRol(),
-                usuario.getDocPais(),
-                usuario.getDocTipo(),
-                usuario.getDocNumero(),
-                usuario.getDirPais(),
-                usuario.getDirLocalidad(),
-                usuario.getDirCalle(),
-                usuario.getDirNumero(),
-                usuario.getDirCodPostal());
+    public void insertTelefono(Long idUsuario, String telefono) {
+        String sql = "insert into Usuario_Telefono (Id_Usuario, Telefono) values (?, ?)";
+        jdbc.update(sql, idUsuario, telefono);
     }
 
-    // agrega un telefono a un usuario existente
-    // se llama una vez por cada telefono de la lista al registrarse
-    public void insertTelefono(String mail, String telefono) {
-        String sql = "insert into Usuario_Telefono (mail, telefono) values (?, ?)";
-        jdbc.update(sql, mail, telefono);
+    public List<String> findTelefonosByIdUsuario(Long idUsuario) {
+        String sql = "select Telefono from Usuario_Telefono where Id_Usuario = ?";
+        return jdbc.queryForList(sql, String.class, idUsuario);
     }
 
-    // devuelve la lista de telefonos asociados a un usuario
-    public List<String> findTelefonosByMail(String mail) {
-        String sql = "select telefono from Usuario_Telefono where mail = ?";
-        return jdbc.queryForList(sql, String.class, mail);
-    }
 
-    // actualiza los datos basicos del usuario (no el password ni el rol,
-    // esos tienen sus propios metodos especificos por seguridad)
-    public void updateDatosBasicos(Usuario usuario) {
-        String sql = "update Usuario set " +
-                     "dir_pais = ?, dir_localidad = ?, dir_calle = ?, " +
-                     "dir_numero = ?, dir_cod_postal = ? " +
-                     "where mail = ?";
-        jdbc.update(sql,
-                usuario.getDirPais(),
-                usuario.getDirLocalidad(),
-                usuario.getDirCalle(),
-                usuario.getDirNumero(),
-                usuario.getDirCodPostal(),
-                usuario.getMail());
+    //determina el rol de un usuario consultando las 3 tablas de especializacion de roles
+    public String findRolByIdUsuario(Long idUsuario) {
+        String sqlAdmin = "select count(*) from Adm_Pais_Sede where Id_Usuario = ?";
+        Integer esAdmin = jdbc.queryForObject(sqlAdmin, Integer.class, idUsuario);
+        if (esAdmin != null && esAdmin > 0) {
+            return "ADMIN";
+        }
+
+        String sqlFuncionario = "select count(*) from Func_Validacion where Id_Usuario = ?";
+        Integer esFuncionario = jdbc.queryForObject(sqlFuncionario, Integer.class, idUsuario);
+        if (esFuncionario != null && esFuncionario > 0) {
+            return "FUNCIONARIO";
+        }
+
+        String sqlUsuarioGeneral = "select count(*) from Usuario_General where Id_Usuario = ?";
+        Integer esUsuarioGeneral = jdbc.queryForObject(sqlUsuarioGeneral, Integer.class, idUsuario);
+        if (esUsuarioGeneral != null && esUsuarioGeneral > 0) {
+            return "USUARIO";
+        }
+
+        return null;
     }
 }

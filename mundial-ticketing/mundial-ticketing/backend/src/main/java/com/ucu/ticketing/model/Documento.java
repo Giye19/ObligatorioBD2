@@ -7,9 +7,11 @@ import lombok.AllArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaisSede {
+public class Documento {
 
-    private Long idPaisSede;
+    private Long idDocumento;
     private Long idPais;
     private String nombrePais;
+    private String tipoDocumento;
+    private String numeroDocumento;
 }

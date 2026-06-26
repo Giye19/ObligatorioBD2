@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-// expone los endpoints de transferencia de entradas entre usuarios
 @RestController
 @RequestMapping("/api/transferencias")
 public class TransferenciaController {
@@ -22,7 +21,6 @@ public class TransferenciaController {
         this.transferenciaService = transferenciaService;
     }
 
-    // inicia una transferencia de una entrada hacia otro usuario
     @PostMapping
     @PreAuthorize("hasRole('USUARIO')")
     public ResponseEntity<TransferenciaResponse> iniciar(@Valid @RequestBody TransferenciaRequest request,
@@ -31,25 +29,22 @@ public class TransferenciaController {
         return ResponseEntity.ok(response);
     }
 
-    // acepta una transferencia pendiente dirigida al usuario autenticado
     @PostMapping("/{id}/aceptar")
     @PreAuthorize("hasRole('USUARIO')")
-    public ResponseEntity<TransferenciaResponse> aceptar(@PathVariable Integer id,
+    public ResponseEntity<TransferenciaResponse> aceptar(@PathVariable Long id,
                                                           @AuthenticationPrincipal String mailDestino) {
         TransferenciaResponse response = transferenciaService.aceptar(id, mailDestino);
         return ResponseEntity.ok(response);
     }
 
-    // rechaza una transferencia pendiente dirigida al usuario autenticado
     @PostMapping("/{id}/rechazar")
     @PreAuthorize("hasRole('USUARIO')")
-    public ResponseEntity<TransferenciaResponse> rechazar(@PathVariable Integer id,
+    public ResponseEntity<TransferenciaResponse> rechazar(@PathVariable Long id,
                                                            @AuthenticationPrincipal String mailDestino) {
         TransferenciaResponse response = transferenciaService.rechazar(id, mailDestino);
         return ResponseEntity.ok(response);
     }
 
-    // devuelve el historico de transferencias del usuario autenticado
     @GetMapping("/mis-transferencias")
     @PreAuthorize("hasRole('USUARIO')")
     public ResponseEntity<List<TransferenciaResponse>> misTransferencias(
@@ -57,10 +52,8 @@ public class TransferenciaController {
         return ResponseEntity.ok(transferenciaService.findByUsuario(mail));
     }
 
-    // devuelve el historico completo de transferencias de una entrada
-    // (cadena de custodia), accesible para cualquier usuario autenticado
     @GetMapping("/entrada/{idEntrada}")
-    public ResponseEntity<List<TransferenciaResponse>> historialEntrada(@PathVariable Integer idEntrada) {
+    public ResponseEntity<List<TransferenciaResponse>> historialEntrada(@PathVariable Long idEntrada) {
         return ResponseEntity.ok(transferenciaService.findHistorialByEntrada(idEntrada));
     }
 }

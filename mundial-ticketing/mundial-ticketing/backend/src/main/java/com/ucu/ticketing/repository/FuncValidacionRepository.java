@@ -7,8 +7,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Func_Validacion
-// (especializacion de Usuario)
 @Repository
 public class FuncValidacionRepository {
 
@@ -20,41 +18,38 @@ public class FuncValidacionRepository {
 
     private final RowMapper<FuncValidacion> rowMapper = (rs, rowNum) -> {
         FuncValidacion fv = new FuncValidacion();
-        fv.setMail(rs.getString("mail"));
-        fv.setNroLegajo(rs.getString("nro_legajo"));
+        fv.setIdFuncionario(rs.getLong("Id_Funcionario"));
+        fv.setIdUsuario(rs.getLong("Id_Usuario"));
+        fv.setNroLegajo(rs.getString("Nro_Legajo"));
+        fv.setActivo(rs.getBoolean("Activo"));
         return fv;
     };
 
-    // busca un funcionario de validacion por mail
-    // devuelve null si el usuario no tiene este rol
-    public FuncValidacion findByMail(String mail) {
-        String sql = "select * from Func_Validacion where mail = ?";
-        List<FuncValidacion> resultado = jdbc.query(sql, rowMapper, mail);
+    public FuncValidacion findByIdUsuario(Long idUsuario) {
+        String sql = "select * from Func_Validacion where Id_Usuario = ?";
+        List<FuncValidacion> resultado = jdbc.query(sql, rowMapper, idUsuario);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // inserta la especializacion de funcionario de validacion
-    // solo deberia poder ejecutarse desde un alta administrativa,
-    // esa restriccion de quien puede llamarlo se controla en el service
-    public void insert(FuncValidacion funcValidacion) {
-        String sql = "insert into Func_Validacion (mail, nro_legajo) values (?, ?)";
-        jdbc.update(sql, funcValidacion.getMail(), funcValidacion.getNroLegajo());
+    public FuncValidacion findById(Long idFuncionario) {
+        String sql = "select * from Func_Validacion where Id_Funcionario = ?";
+        List<FuncValidacion> resultado = jdbc.query(sql, rowMapper, idFuncionario);
+        return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // lista todos los sectores a los que esta asignado un funcionario
-    // dentro de un estadio especifico
-    // se usa para validar la regla: "debe haber validado entradas
-    // en todos los sectores a los que fue asignado durante un evento"
-    public List<String> findSectoresAsignados(String mailFuncionario, Integer idEstadio) {
-        String sql = "select letra_sector from Func_Sector_Asignado " +
-                     "where mail_funcionario = ? and id_estadio = ?";
-        return jdbc.queryForList(sql, String.class, mailFuncionario, idEstadio);
+    public List<Long> findSectoresAsignados(Long idFuncionario, Long idEvento) {
+        String sql = "select fes.Id_Evento_Sector from Funcionario_Evento_Sector fes " +
+                     "join Evento_Sector es on es.Id_Evento_Sector = fes.Id_Evento_Sector " +
+                     "where fes.Id_Funcionario = ? and es.Id_Evento = ?";
+        return jdbc.query(sql, (rs, rowNum) -> rs.getLong("Id_Evento_Sector"), idFuncionario, idEvento);
     }
 
-    // asigna un funcionario a un sector especifico
-    public void asignarSector(String mailFuncionario, Integer idEstadio, String letraSector) {
-        String sql = "insert into Func_Sector_Asignado " +
-                     "(mail_funcionario, id_estadio, letra_sector) values (?, ?, ?)";
-        jdbc.update(sql, mailFuncionario, idEstadio, letraSector);
+    public void asignarSector(Long idFuncionario, Long idEventoSector) {
+        String sql = "insert into Funcionario_Evento_Sector (Id_Funcionario, Id_Evento_Sector) values (?, ?)";
+        jdbc.update(sql, idFuncionario, idEventoSector);
+    }
+    public List<FuncValidacion> findAll() {
+        String sql = "select * from Func_Validacion";
+        return jdbc.query(sql, rowMapper);
     }
 }

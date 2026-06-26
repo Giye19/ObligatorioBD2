@@ -11,7 +11,6 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Transferencia
 @Repository
 public class TransferenciaRepository {
 
@@ -23,70 +22,57 @@ public class TransferenciaRepository {
 
     private final RowMapper<Transferencia> rowMapper = (rs, rowNum) -> {
         Transferencia t = new Transferencia();
-        t.setIdTransferencia(rs.getInt("id_transferencia"));
-        t.setIdEntrada(rs.getInt("id_entrada"));
-        t.setMailOrigen(rs.getString("mail_origen"));
-        t.setMailDestino(rs.getString("mail_destino"));
-        t.setFechaTransferencia(rs.getTimestamp("fecha_transferencia").toLocalDateTime());
-        t.setEstado(rs.getString("estado"));
+        t.setIdTransferencia(rs.getLong("Id_Transferencia"));
+        t.setIdEntrada(rs.getLong("Id_Entrada"));
+        t.setIdUsuarioOrigen(rs.getLong("Id_Usuario_Origen"));
+        t.setIdUsuarioDestino(rs.getLong("Id_Usuario_Destino"));
+        t.setFechaTransferencia(rs.getTimestamp("Fecha_Transferencia").toLocalDateTime());
+        t.setEstadoTransferencia(rs.getString("Estado_Transferencia"));
         return t;
     };
 
-    // busca una transferencia por id, devuelve null si no existe
-    public Transferencia findById(Integer idTransferencia) {
-        String sql = "select * from Transferencia where id_transferencia = ?";
+    public Transferencia findById(Long idTransferencia) {
+        String sql = "select * from Transferencia where Id_Transferencia = ?";
         List<Transferencia> resultado = jdbc.query(sql, rowMapper, idTransferencia);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // devuelve el historico completo de transferencias de una entrada,
-    // ordenado cronologicamente, para reconstruir la cadena de custodia
-    public List<Transferencia> findByEntrada(Integer idEntrada) {
-        String sql = "select * from Transferencia where id_entrada = ? " +
-                     "order by fecha_transferencia asc";
+    public List<Transferencia> findByEntrada(Long idEntrada) {
+        String sql = "select * from Transferencia where Id_Entrada = ? order by Fecha_Transferencia asc";
         return jdbc.query(sql, rowMapper, idEntrada);
     }
 
-    // devuelve las transferencias donde el usuario fue origen o destino
-    // se usa en "ver mis transferencias"
-    public List<Transferencia> findByUsuario(String mail) {
+    public List<Transferencia> findByUsuario(Long idUsuarioGeneral) {
         String sql = "select * from Transferencia " +
-                     "where mail_origen = ? or mail_destino = ? " +
-                     "order by fecha_transferencia desc";
-        return jdbc.query(sql, rowMapper, mail, mail);
+                     "where Id_Usuario_Origen = ? or Id_Usuario_Destino = ? " +
+                     "order by Fecha_Transferencia desc";
+        return jdbc.query(sql, rowMapper, idUsuarioGeneral, idUsuarioGeneral);
     }
 
-    // busca si existe una transferencia pendiente para una entrada
-    // se usa para no permitir iniciar una segunda transferencia
-    // mientras la primera no fue aceptada o rechazada
-    public Transferencia findPendientePorEntrada(Integer idEntrada) {
-        String sql = "select * from Transferencia " +
-                     "where id_entrada = ? and estado = 'PENDIENTE'";
+    public Transferencia findPendientePorEntrada(Long idEntrada) {
+        String sql = "select * from Transferencia where Id_Entrada = ? and Estado_Transferencia = 'PENDIENTE'";
         List<Transferencia> resultado = jdbc.query(sql, rowMapper, idEntrada);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // inserta una nueva transferencia en estado pendiente
-    // y devuelve el id autogenerado
-    public Integer insert(Transferencia transferencia) {
-        String sql = "insert into Transferencia (id_entrada, mail_origen, mail_destino, estado) " +
+    public Long insert(Transferencia transferencia) {
+        String sql = "insert into Transferencia (Id_Entrada, Id_Usuario_Origen, Id_Usuario_Destino, Estado_Transferencia) " +
                      "values (?, ?, ?, 'PENDIENTE')";
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setInt(1, transferencia.getIdEntrada());
-            ps.setString(2, transferencia.getMailOrigen());
-            ps.setString(3, transferencia.getMailDestino());
+            ps.setLong(1, transferencia.getIdEntrada());
+            ps.setLong(2, transferencia.getIdUsuarioOrigen());
+            ps.setLong(3, transferencia.getIdUsuarioDestino());
             return ps;
         }, keyHolder);
 
-        return keyHolder.getKey().intValue();
+        return keyHolder.getKey().longValue();
     }
 
-    // actualiza el estado de una transferencia (aceptada o rechazada)
-    public void updateEstado(Integer idTransferencia, String nuevoEstado) {
-        String sql = "update Transferencia set estado = ? where id_transferencia = ?";
+    public void updateEstado(Long idTransferencia, String nuevoEstado) {
+        String sql = "update Transferencia set Estado_Transferencia = ? where Id_Transferencia = ?";
         jdbc.update(sql, nuevoEstado, idTransferencia);
     }
 }

@@ -19,7 +19,7 @@ import java.util.List;
 public class EventoRequest {
 
     @NotNull(message = "El estadio es obligatorio")
-    private Integer idEstadio;
+    private Long idEstadio;
 
     @NotBlank(message = "El equipo local es obligatorio")
     private String equipoLocal;

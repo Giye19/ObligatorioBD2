@@ -29,7 +29,7 @@ public class ValidacionController {
     // este en primer plano, para mantener el qr siempre vigente
     @PostMapping("/qr/{idEntrada}/generar")
     @PreAuthorize("hasRole('USUARIO')")
-    public ResponseEntity<QrResponse> generarQr(@PathVariable Integer idEntrada,
+    public ResponseEntity<QrResponse> generarQr(@PathVariable Long idEntrada,
                                                  @AuthenticationPrincipal String mail) {
         return ResponseEntity.ok(qrService.generarNuevo(idEntrada, mail));
     }
@@ -37,7 +37,7 @@ public class ValidacionController {
     // consulta el qr activo actual sin regenerarlo
     @GetMapping("/qr/{idEntrada}")
     @PreAuthorize("hasRole('USUARIO')")
-    public ResponseEntity<QrResponse> obtenerQr(@PathVariable Integer idEntrada,
+    public ResponseEntity<QrResponse> obtenerQr(@PathVariable Long idEntrada,
                                                  @AuthenticationPrincipal String mail) {
         return ResponseEntity.ok(qrService.obtenerActivo(idEntrada, mail));
     }
@@ -50,3 +50,6 @@ public class ValidacionController {
         return ResponseEntity.ok(validacionService.validarAcceso(request));
     }
 }
+
+
+

@@ -4,12 +4,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-//tabla Dispositivo
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Dispositivo {
 
-    private String idDispositivo;
-    private String mailFuncionario;
+    private Long idDispositivo;
+    private Long idFuncionario;
+    private String codigoDispositivo;
+    private Boolean activo;
 }

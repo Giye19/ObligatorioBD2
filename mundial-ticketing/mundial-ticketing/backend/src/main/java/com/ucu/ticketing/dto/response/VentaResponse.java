@@ -14,7 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 public class VentaResponse {
 
-    private Integer idVenta;
+    private Long idVenta;
     private String mailComprador;
     private LocalDateTime fechaVenta;
     private String estado;

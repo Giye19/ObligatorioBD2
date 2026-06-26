@@ -5,11 +5,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.sql.Date;
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Usuario_General
-// (especializacion de Usuario)
 @Repository
 public class UsuarioGeneralRepository {
 
@@ -21,35 +18,29 @@ public class UsuarioGeneralRepository {
 
     private final RowMapper<UsuarioGeneral> rowMapper = (rs, rowNum) -> {
         UsuarioGeneral ug = new UsuarioGeneral();
-        ug.setMail(rs.getString("mail"));
-        ug.setFechaRegistro(rs.getDate("fecha_registro").toLocalDate());
-        ug.setEstadoVerificacion(rs.getString("estado_verificacion"));
+        ug.setIdUsuarioGeneral(rs.getLong("Id_Usuario_General"));
+        ug.setIdUsuario(rs.getLong("Id_Usuario"));
+        ug.setFechaRegistro(rs.getTimestamp("Fecha_Registro").toLocalDateTime());
+        ug.setEstadoVerificacion(rs.getString("Estado_Verificacion"));
         return ug;
     };
 
-    // busca los datos de usuario general por mail
-    // devuelve null si el usuario no tiene este rol
-    public UsuarioGeneral findByMail(String mail) {
-        String sql = "select * from Usuario_General where mail = ?";
-        List<UsuarioGeneral> resultado = jdbc.query(sql, rowMapper, mail);
+    public UsuarioGeneral findByIdUsuario(Long idUsuario) {
+        String sql = "select * from Usuario_General where Id_Usuario = ?";
+        List<UsuarioGeneral> resultado = jdbc.query(sql, rowMapper, idUsuario);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // inserta la especializacion de usuario general
-    // se llama justo despues de insertar en Usuario (en el service,
-    // dentro de la misma operacion de registro)
-    public void insert(UsuarioGeneral usuarioGeneral) {
-        String sql = "insert into Usuario_General (mail, fecha_registro, estado_verificacion) " +
-                     "values (?, ?, ?)";
-        jdbc.update(sql,
-                usuarioGeneral.getMail(),
-                Date.valueOf(usuarioGeneral.getFechaRegistro()),
-                usuarioGeneral.getEstadoVerificacion());
+    public Long insert(Long idUsuario) {
+        String sql = "insert into Usuario_General (Id_Usuario, Estado_Verificacion) values (?, 'PENDIENTE')";
+        jdbc.update(sql, idUsuario);
+
+        return findByIdUsuario(idUsuario).getIdUsuarioGeneral();
     }
 
-    // actualiza el estado de verificacion de identidad de un usuario
-    public void updateEstadoVerificacion(String mail, String nuevoEstado) {
-        String sql = "update Usuario_General set estado_verificacion = ? where mail = ?";
-        jdbc.update(sql, nuevoEstado, mail);
+    public Long findIdUsuarioById(Long idUsuarioGeneral) {
+        String sql = "select Id_Usuario from Usuario_General where Id_Usuario_General = ?";
+        List<Long> resultado = jdbc.queryForList(sql, Long.class, idUsuarioGeneral);
+        return resultado.isEmpty() ? null : resultado.get(0);
     }
 }

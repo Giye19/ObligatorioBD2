@@ -7,9 +7,13 @@ import lombok.AllArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaisSede {
+public class Direccion {
 
-    private Long idPaisSede;
+    private Long idDireccion;
     private Long idPais;
     private String nombrePais;
+    private String localidad;
+    private String calle;
+    private String numeroDireccion;
+    private String codigoPostal;
 }

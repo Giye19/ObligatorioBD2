@@ -8,18 +8,16 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-//tabla Venta
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Venta {
 
-    private Integer idVenta;
-    private String mailComprador;
-    private Integer idComision;
+    private Long idVenta;
+    private Long idUsuarioGeneral;
+    private Long idComision;
     private LocalDateTime fechaVenta;
-    private String estado; // PENDIENTE CONFIRMADA PAGA
+    private String estadoVenta;
     private BigDecimal montoTotal;
 
     private List<Entrada> entradas;

@@ -6,13 +6,14 @@ import lombok.AllArgsConstructor;
 
 import java.time.LocalDate;
 
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class AdmPaisSede {
 
-    private String mail;
+    private Long idAdmin;
+    private Long idUsuario;
+    private Long idPaisSede;
     private LocalDate fechaAsignacion;
-    private String nombrePais; // FK a Pais_Sede
+    private Boolean activo;
 }

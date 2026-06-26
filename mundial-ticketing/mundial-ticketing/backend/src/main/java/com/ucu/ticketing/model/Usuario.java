@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -11,22 +12,14 @@ import java.util.List;
 @AllArgsConstructor
 public class Usuario {
 
+    private Long idUsuario;
+    private Long idDocumento;
+    private Long idDireccion;
     private String mail;
-    private String password;   // hash BCrypt, nunca se expone en DTOs de salida
-    private String rol;        // ADMIN  FUNCIONARIO  USUARIO
+    private String password;
+    private String nombre;
+    private String apellido;
+    private LocalDateTime fechaCreacion;
 
-    // documento (compuesto)
-    private String docPais;
-    private String docTipo;
-    private String docNumero;
-
-    // dirección (compuesta)
-    private String dirPais;
-    private String dirLocalidad;
-    private String dirCalle;
-    private String dirNumero;
-    private String dirCodPostal;
-
-    // lista de teléfonos asociados
     private List<String> telefonos;
 }

@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class RankingEventoResponse {
 
-    private Integer idEvento;
+    private Long idEvento;
     private String nombreEstadio;
     private String equipoLocal;
     private String equipoVisitante;

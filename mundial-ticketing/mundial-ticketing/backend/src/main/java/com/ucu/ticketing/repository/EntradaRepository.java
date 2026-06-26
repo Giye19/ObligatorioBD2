@@ -11,7 +11,6 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Entrada
 @Repository
 public class EntradaRepository {
 
@@ -23,102 +22,76 @@ public class EntradaRepository {
 
     private final RowMapper<Entrada> rowMapper = (rs, rowNum) -> {
         Entrada e = new Entrada();
-        e.setIdEntrada(rs.getInt("id_entrada"));
-        e.setIdVenta(rs.getInt("id_venta"));
-        e.setIdEvento(rs.getInt("id_evento"));
-        e.setIdEstadio(rs.getInt("id_estadio"));
-        e.setLetraSector(rs.getString("letra_sector"));
-        e.setMailPropietario(rs.getString("mail_propietario"));
-        e.setEstado(rs.getString("estado"));
-        e.setCostoEntrada(rs.getBigDecimal("costo_entrada"));
-        e.setCantTransferencias(rs.getInt("cant_transferencias"));
+        e.setIdEntrada(rs.getLong("Id_Entrada"));
+        e.setIdEventoSector(rs.getLong("Id_Evento_Sector"));
+        e.setIdVenta(rs.getLong("Id_Venta"));
+        e.setIdPropietarioActual(rs.getLong("Id_Propietario_Actual"));
+        e.setCostoEntrada(rs.getBigDecimal("Costo_Entrada"));
+        e.setEstadoEntrada(rs.getString("Estado_Entrada"));
         return e;
     };
 
-    // busca una entrada por id, devuelve null si no existe
-    public Entrada findById(Integer idEntrada) {
-        String sql = "select * from Entrada where id_entrada = ?";
+    public Entrada findById(Long idEntrada) {
+        String sql = "select * from Entrada where Id_Entrada = ?";
         List<Entrada> resultado = jdbc.query(sql, rowMapper, idEntrada);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // devuelve todas las entradas generadas por una venta
-    public List<Entrada> findByVenta(Integer idVenta) {
-        String sql = "select * from Entrada where id_venta = ?";
+    public List<Entrada> findByVenta(Long idVenta) {
+        String sql = "select * from Entrada where Id_Venta = ?";
         return jdbc.query(sql, rowMapper, idVenta);
     }
 
-    // devuelve todas las entradas que actualmente tiene asignadas
-    // un usuario (propietario actual), sin importar de que venta vinieron
-    // se usa en "mis entradas"
-    public List<Entrada> findByPropietario(String mailPropietario) {
-        String sql = "select * from Entrada where mail_propietario = ? " +
-                     "order by id_entrada desc";
-        return jdbc.query(sql, rowMapper, mailPropietario);
+    public List<Entrada> findByPropietario(Long idUsuarioGeneral) {
+        String sql = "select * from Entrada where Id_Propietario_Actual = ? order by Id_Entrada desc";
+        return jdbc.query(sql, rowMapper, idUsuarioGeneral);
     }
 
-    // cuenta cuantas entradas activas (no canceladas) existen
-    // para un evento+sector especifico, usado para calcular
-    // disponibilidad: capacidad - cantidad vendida
-    // se consideran "vendidas" las entradas en estado activa,
-    // transferida o consumida (todo excepto que no haya llegado a existir)
-    public int countEntradasVendidas(Integer idEvento, Integer idEstadio, String letraSector) {
-        String sql = "select count(*) from Entrada " +
-                     "where id_evento = ? and id_estadio = ? and letra_sector = ?";
-        Integer count = jdbc.queryForObject(sql, Integer.class, idEvento, idEstadio, letraSector);
+    public int countEntradasVendidas(Long idEventoSector) {
+        String sql = "select count(*) from Entrada where Id_Evento_Sector = ?";
+        Integer count = jdbc.queryForObject(sql, Integer.class, idEventoSector);
         return count != null ? count : 0;
     }
 
-    // inserta una nueva entrada y devuelve el id autogenerado
-    // estado inicial siempre ACTIVA, cant_transferencias siempre 0
-    public Integer insert(Entrada entrada) {
+    public Long insert(Entrada entrada) {
         String sql = "insert into Entrada " +
-                     "(id_venta, id_evento, id_estadio, letra_sector, mail_propietario, " +
-                     " estado, costo_entrada, cant_transferencias) " +
-                     "values (?, ?, ?, ?, ?, 'ACTIVA', ?, 0)";
+                     "(Id_Evento_Sector, Id_Venta, Id_Propietario_Actual, Costo_Entrada, Estado_Entrada) " +
+                     "values (?, ?, ?, ?, 'NO_CONSUMIDA')";
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setInt(1, entrada.getIdVenta());
-            ps.setInt(2, entrada.getIdEvento());
-            ps.setInt(3, entrada.getIdEstadio());
-            ps.setString(4, entrada.getLetraSector());
-            ps.setString(5, entrada.getMailPropietario());
-            ps.setBigDecimal(6, entrada.getCostoEntrada());
+            ps.setLong(1, entrada.getIdEventoSector());
+            ps.setLong(2, entrada.getIdVenta());
+            ps.setLong(3, entrada.getIdPropietarioActual());
+            ps.setBigDecimal(4, entrada.getCostoEntrada());
             return ps;
         }, keyHolder);
 
-        return keyHolder.getKey().intValue();
+        return keyHolder.getKey().longValue();
     }
 
-    // cambia el propietario de una entrada (se llama al aceptar
-    // una transferencia) e incrementa el contador de transferencias
-    public void transferirPropietario(Integer idEntrada, String nuevoPropietario) {
-        String sql = "update Entrada set mail_propietario = ?, " +
-                     "estado = 'ACTIVA', cant_transferencias = cant_transferencias + 1 " +
-                     "where id_entrada = ?";
-        jdbc.update(sql, nuevoPropietario, idEntrada);
-    }
-
-    // marca una entrada como consumida de forma irreversible,
-    // se llama al validarse el ingreso en puerta
-    public void marcarConsumida(Integer idEntrada) {
-        String sql = "update Entrada set estado = 'CONSUMIDA' where id_entrada = ?";
+    public void marcarConsumida(Long idEntrada) {
+        String sql = "update Entrada set Estado_Entrada = 'CONSUMIDA' where Id_Entrada = ?";
         jdbc.update(sql, idEntrada);
     }
 
-    // devuelve el ranking de eventos con mas entradas vendidas,
-    // limitado a una cantidad maxima
-    // se usa para la funcionalidad de reportes/estadisticas
     public List<Object[]> findRankingEventos(int limite) {
-        String sql = "select e.id_evento, count(*) as cantidad " +
+        String sql = "select ev.Id_Evento, count(*) as cantidad " +
                      "from Entrada e " +
-                     "group by e.id_evento " +
+                     "join Evento_Sector es on es.Id_Evento_Sector = e.Id_Evento_Sector " +
+                     "join Evento ev on ev.Id_Evento = es.Id_Evento " +
+                     "group by ev.Id_Evento " +
                      "order by cantidad desc " +
                      "limit ?";
         return jdbc.query(sql, (rs, rowNum) ->
-                new Object[]{rs.getInt("id_evento"), rs.getInt("cantidad")},
+                new Object[]{rs.getLong("Id_Evento"), rs.getInt("cantidad")},
                 limite);
+    }
+
+    public int countTransferenciasAceptadas(Long idEntrada) {
+        String sql = "select count(*) from Transferencia where Id_Entrada = ? and Estado_Transferencia = 'ACEPTADA'";
+        Integer count = jdbc.queryForObject(sql, Integer.class, idEntrada);
+        return count != null ? count : 0;
     }
 }

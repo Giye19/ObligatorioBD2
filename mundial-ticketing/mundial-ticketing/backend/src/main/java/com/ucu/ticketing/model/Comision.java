@@ -7,15 +7,13 @@ import lombok.AllArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-//tabla Comision
-//fechaFin null significa que esta comision esta vigente actualmente
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Comision {
 
-    private Integer idComision;
-    private BigDecimal porcentaje;
+    private Long idComision;
     private LocalDate fechaInicio;
     private LocalDate fechaFin;
+    private BigDecimal porcentaje;
 }

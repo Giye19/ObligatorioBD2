@@ -9,6 +9,11 @@ export default function Estadios() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [nombre, setNombre] = useState('');
   const [nombrePais, setNombrePais] = useState('');
+  const [dirPais, setDirPais] = useState('');
+  const [dirLocalidad, setDirLocalidad] = useState('');
+  const [dirCalle, setDirCalle] = useState('');
+  const [dirNumero, setDirNumero] = useState('');
+  const [dirCodPostal, setDirCodPostal] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -37,6 +42,11 @@ export default function Estadios() {
   function abrirModal() {
     setNombre('');
     setNombrePais('');
+    setDirPais('');
+    setDirLocalidad('');
+    setDirCalle('');
+    setDirNumero('');
+    setDirCodPostal('');
     setError('');
     setModalAbierto(true);
   }
@@ -44,7 +54,15 @@ export default function Estadios() {
   async function handleCrear() {
     setError('');
     try {
-      await api.post('/estadios', { nombre, nombrePais });
+      await api.post('/estadios', {
+        nombre,
+        nombrePais,
+        dirPais,
+        dirLocalidad,
+        dirCalle,
+        dirNumero,
+        dirCodPostal,
+      });
       setModalAbierto(false);
       cargarEstadios();
     } catch (err) {
@@ -103,6 +121,31 @@ export default function Estadios() {
                   <option key={pais} value={pais}>{pais}</option>
                 ))}
               </select>
+            </div>
+
+            <div className={styles.field}>
+              <label>País (dirección)</label>
+              <input value={dirPais} onChange={(e) => setDirPais(e.target.value)} />
+            </div>
+
+            <div className={styles.field}>
+              <label>Localidad</label>
+              <input value={dirLocalidad} onChange={(e) => setDirLocalidad(e.target.value)} />
+            </div>
+
+            <div className={styles.field}>
+              <label>Calle</label>
+              <input value={dirCalle} onChange={(e) => setDirCalle(e.target.value)} />
+            </div>
+
+            <div className={styles.field}>
+              <label>Número</label>
+              <input value={dirNumero} onChange={(e) => setDirNumero(e.target.value)} />
+            </div>
+
+            <div className={styles.field}>
+              <label>Código postal</label>
+              <input value={dirCodPostal} onChange={(e) => setDirCodPostal(e.target.value)} />
             </div>
 
             <div className={styles.modalButtons}>

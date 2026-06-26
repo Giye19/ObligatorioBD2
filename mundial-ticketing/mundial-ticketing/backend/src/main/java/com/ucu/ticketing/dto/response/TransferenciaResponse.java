@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class TransferenciaResponse {
 
-    private Integer idTransferencia;
-    private Integer idEntrada;
+    private Long idTransferencia;
+    private Long idEntrada;
     private String mailOrigen;
     private String mailDestino;
     private LocalDateTime fechaTransferencia;

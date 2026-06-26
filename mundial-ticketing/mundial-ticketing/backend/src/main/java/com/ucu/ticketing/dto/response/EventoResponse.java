@@ -14,8 +14,8 @@ import java.util.List;
 @AllArgsConstructor
 public class EventoResponse {
 
-    private Integer idEvento;
-    private Integer idEstadio;
+    private Long idEvento;
+    private Long idEstadio;
     private String nombreEstadio;
     private String nombrePaisSede;
     private String equipoLocal;

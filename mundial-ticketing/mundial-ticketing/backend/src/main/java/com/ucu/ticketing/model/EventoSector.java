@@ -6,16 +6,14 @@ import lombok.AllArgsConstructor;
 
 import java.math.BigDecimal;
 
-
-//tabla Evento_Sector
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class EventoSector {
 
-    private Integer idEvento;
-    private Integer idEstadio;
+    private Long idEventoSector;
+    private Long idEvento;
+    private Long idSector;
     private String letraSector;
     private BigDecimal costoEntrada;
 }

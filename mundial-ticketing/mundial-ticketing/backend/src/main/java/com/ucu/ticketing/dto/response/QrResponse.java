@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class QrResponse {
 
-    private Integer idQr;
-    private Integer idEntrada;
+    private Long idQr;
+    private Long idEntrada;
     private String token;
     private LocalDateTime fechaExpiracion;
 }

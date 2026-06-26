@@ -5,9 +5,12 @@ import com.ucu.ticketing.dto.response.TransferenciaResponse;
 import com.ucu.ticketing.exception.BusinessException;
 import com.ucu.ticketing.model.Entrada;
 import com.ucu.ticketing.model.Transferencia;
+import com.ucu.ticketing.model.Usuario;
+import com.ucu.ticketing.model.UsuarioGeneral;
 import com.ucu.ticketing.repository.EntradaRepository;
 import com.ucu.ticketing.repository.TransferenciaRepository;
 import com.ucu.ticketing.repository.UsuarioGeneralRepository;
+import com.ucu.ticketing.repository.UsuarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,59 +18,39 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
-// contiene la logica de transferencia de entradas entre usuarios
-// valida limite de 3 transferencias, propietario actual, y que
-// no haya una transferencia pendiente sin resolver
 @Service
 public class TransferenciaService {
 
-    // cantidad maxima de transferencias permitidas para una entrada
-    // antes de su validacion en puerta, segun la consigna: "una entrada
-    // puede ser transferida como maximo 3 veces antes de su validacion"
-    private static final int MAXIMO_TRANSFERENCIAS = 3;
-
     private final TransferenciaRepository transferenciaRepository;
     private final EntradaRepository entradaRepository;
+    private final UsuarioRepository usuarioRepository;
     private final UsuarioGeneralRepository usuarioGeneralRepository;
 
     public TransferenciaService(TransferenciaRepository transferenciaRepository,
                                  EntradaRepository entradaRepository,
+                                 UsuarioRepository usuarioRepository,
                                  UsuarioGeneralRepository usuarioGeneralRepository) {
         this.transferenciaRepository = transferenciaRepository;
         this.entradaRepository = entradaRepository;
+        this.usuarioRepository = usuarioRepository;
         this.usuarioGeneralRepository = usuarioGeneralRepository;
     }
 
-    // inicia una transferencia de una entrada hacia otro usuario
-    // queda en estado pendiente hasta que el destinatario la acepte
     @Transactional
     public TransferenciaResponse iniciar(TransferenciaRequest request, String mailOrigen) {
+
+        Long idUsuarioGeneralOrigen = resolverIdUsuarioGeneral(mailOrigen);
 
         Entrada entrada = entradaRepository.findById(request.getIdEntrada());
         if (entrada == null) {
             throw new BusinessException("La entrada no existe", HttpStatus.NOT_FOUND);
         }
 
-        // valida que quien transfiere sea el propietario actual
-        if (!entrada.getMailPropietario().equals(mailOrigen)) {
-            throw new BusinessException(
-                    "Solo el propietario actual puede transferir esta entrada", HttpStatus.FORBIDDEN);
-        }
-
-        // valida que la entrada no haya sido consumida ya
-        if ("CONSUMIDA".equals(entrada.getEstado())) {
+        if ("CONSUMIDA".equals(entrada.getEstadoEntrada())) {
             throw new BusinessException(
                     "No se puede transferir una entrada ya consumida", HttpStatus.CONFLICT);
         }
 
-        // valida que no se haya alcanzado el limite de transferencias
-        if (entrada.getCantTransferencias() >= MAXIMO_TRANSFERENCIAS) {
-            throw new BusinessException(
-                    "La entrada ya alcanzo el maximo de " + MAXIMO_TRANSFERENCIAS + " transferencias",
-                    HttpStatus.CONFLICT);
-        }
-
-        // valida que no haya ya una transferencia pendiente para esta entrada
         Transferencia pendienteExistente = transferenciaRepository.findPendientePorEntrada(
                 request.getIdEntrada());
         if (pendienteExistente != null) {
@@ -75,108 +58,132 @@ public class TransferenciaService {
                     "Ya existe una transferencia pendiente para esta entrada", HttpStatus.CONFLICT);
         }
 
-        // valida que el destinatario sea un usuario general existente
-        if (usuarioGeneralRepository.findByMail(request.getMailDestino()) == null) {
-            throw new BusinessException(
-                    "El usuario destino no existe o no es un usuario general", HttpStatus.BAD_REQUEST);
+        Usuario usuarioDestino = usuarioRepository.findByMail(request.getMailDestino());
+        if (usuarioDestino == null) {
+            throw new BusinessException("El usuario destino no existe", HttpStatus.BAD_REQUEST);
         }
 
-        // valida que no se transfiera a si mismo
-        if (mailOrigen.equals(request.getMailDestino())) {
+        UsuarioGeneral usuarioGeneralDestino = usuarioGeneralRepository.findByIdUsuario(usuarioDestino.getIdUsuario());
+        if (usuarioGeneralDestino == null) {
+            throw new BusinessException(
+                    "El usuario destino no es un usuario general", HttpStatus.BAD_REQUEST);
+        }
+
+        if (idUsuarioGeneralOrigen.equals(usuarioGeneralDestino.getIdUsuarioGeneral())) {
             throw new BusinessException(
                     "No se puede transferir una entrada a si mismo", HttpStatus.BAD_REQUEST);
         }
 
         Transferencia transferencia = new Transferencia();
         transferencia.setIdEntrada(request.getIdEntrada());
-        transferencia.setMailOrigen(mailOrigen);
-        transferencia.setMailDestino(request.getMailDestino());
+        transferencia.setIdUsuarioOrigen(idUsuarioGeneralOrigen);
+        transferencia.setIdUsuarioDestino(usuarioGeneralDestino.getIdUsuarioGeneral());
 
-        Integer idTransferencia = transferenciaRepository.insert(transferencia);
-        transferencia.setIdTransferencia(idTransferencia);
-        transferencia.setEstado("PENDIENTE");
+        Long idTransferencia = transferenciaRepository.insert(transferencia);
 
-        return toResponse(transferencia);
+        Transferencia creada = transferenciaRepository.findById(idTransferencia);
+        return toResponse(creada);
     }
 
-    // acepta una transferencia pendiente, lo cual recien ahi cambia
-    // el propietario real de la entrada (desacoplamiento compra/tenencia)
     @Transactional
-    public TransferenciaResponse aceptar(Integer idTransferencia, String mailDestino) {
+    public TransferenciaResponse aceptar(Long idTransferencia, String mailDestino) {
+
+        Long idUsuarioGeneralDestino = resolverIdUsuarioGeneral(mailDestino);
 
         Transferencia transferencia = transferenciaRepository.findById(idTransferencia);
         if (transferencia == null) {
             throw new BusinessException("La transferencia no existe", HttpStatus.NOT_FOUND);
         }
 
-        // valida que quien acepta sea el destinatario
-        if (!transferencia.getMailDestino().equals(mailDestino)) {
+        if (!transferencia.getIdUsuarioDestino().equals(idUsuarioGeneralDestino)) {
             throw new BusinessException(
                     "Solo el destinatario puede aceptar esta transferencia", HttpStatus.FORBIDDEN);
         }
 
-        // valida que siga pendiente (no fue aceptada ni rechazada antes)
-        if (!"PENDIENTE".equals(transferencia.getEstado())) {
+        if (!"PENDIENTE".equals(transferencia.getEstadoTransferencia())) {
             throw new BusinessException(
                     "Esta transferencia ya fue resuelta anteriormente", HttpStatus.CONFLICT);
         }
 
         transferenciaRepository.updateEstado(idTransferencia, "ACEPTADA");
-        entradaRepository.transferirPropietario(transferencia.getIdEntrada(), mailDestino);
 
-        transferencia.setEstado("ACEPTADA");
-        return toResponse(transferencia);
+        Transferencia actualizada = transferenciaRepository.findById(idTransferencia);
+        return toResponse(actualizada);
     }
 
-    // rechaza una transferencia pendiente, la entrada queda disponible
-    // para que el origen intente transferirla a otro destinatario
     @Transactional
-    public TransferenciaResponse rechazar(Integer idTransferencia, String mailDestino) {
+    public TransferenciaResponse rechazar(Long idTransferencia, String mailDestino) {
+
+        Long idUsuarioGeneralDestino = resolverIdUsuarioGeneral(mailDestino);
 
         Transferencia transferencia = transferenciaRepository.findById(idTransferencia);
         if (transferencia == null) {
             throw new BusinessException("La transferencia no existe", HttpStatus.NOT_FOUND);
         }
 
-        if (!transferencia.getMailDestino().equals(mailDestino)) {
+        if (!transferencia.getIdUsuarioDestino().equals(idUsuarioGeneralDestino)) {
             throw new BusinessException(
                     "Solo el destinatario puede rechazar esta transferencia", HttpStatus.FORBIDDEN);
         }
 
-        if (!"PENDIENTE".equals(transferencia.getEstado())) {
+        if (!"PENDIENTE".equals(transferencia.getEstadoTransferencia())) {
             throw new BusinessException(
                     "Esta transferencia ya fue resuelta anteriormente", HttpStatus.CONFLICT);
         }
 
         transferenciaRepository.updateEstado(idTransferencia, "RECHAZADA");
 
-        transferencia.setEstado("RECHAZADA");
-        return toResponse(transferencia);
+        Transferencia actualizada = transferenciaRepository.findById(idTransferencia);
+        return toResponse(actualizada);
     }
 
-    // devuelve el historico de transferencias donde el usuario
-    // participo como origen o como destino
     public List<TransferenciaResponse> findByUsuario(String mail) {
-        return transferenciaRepository.findByUsuario(mail).stream()
+        Long idUsuarioGeneral = resolverIdUsuarioGeneral(mail);
+
+        return transferenciaRepository.findByUsuario(idUsuarioGeneral).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
-    // devuelve la cadena de custodia completa de una entrada,
-    // permitiendo reconstruir el camino desde su emision original
-    public List<TransferenciaResponse> findHistorialByEntrada(Integer idEntrada) {
+    public List<TransferenciaResponse> findHistorialByEntrada(Long idEntrada) {
         return transferenciaRepository.findByEntrada(idEntrada).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
+    private Long resolverIdUsuarioGeneral(String mail) {
+        Usuario usuario = usuarioRepository.findByMail(mail);
+        if (usuario == null) {
+            throw new BusinessException("El usuario no existe", HttpStatus.UNAUTHORIZED);
+        }
+
+        UsuarioGeneral usuarioGeneral = usuarioGeneralRepository.findByIdUsuario(usuario.getIdUsuario());
+        if (usuarioGeneral == null) {
+            throw new BusinessException("El usuario no es un usuario general", HttpStatus.FORBIDDEN);
+        }
+
+        return usuarioGeneral.getIdUsuarioGeneral();
+    }
+
     private TransferenciaResponse toResponse(Transferencia t) {
+        String mailOrigen = resolverMail(t.getIdUsuarioOrigen());
+        String mailDestino = resolverMail(t.getIdUsuarioDestino());
+
         return new TransferenciaResponse(
                 t.getIdTransferencia(),
                 t.getIdEntrada(),
-                t.getMailOrigen(),
-                t.getMailDestino(),
+                mailOrigen,
+                mailDestino,
                 t.getFechaTransferencia(),
-                t.getEstado());
+                t.getEstadoTransferencia());
+    }
+
+    private String resolverMail(Long idUsuarioGeneral) {
+        Long idUsuario = usuarioGeneralRepository.findIdUsuarioById(idUsuarioGeneral);
+        if (idUsuario == null) {
+            return null;
+        }
+        Usuario usuario = usuarioRepository.findById(idUsuario);
+        return usuario != null ? usuario.getMail() : null;
     }
 }

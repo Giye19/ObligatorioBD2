@@ -30,7 +30,7 @@ public class EstadioController {
 
     // devuelve el detalle de un estadio especifico con sus sectores
     @GetMapping("/{id}")
-    public ResponseEntity<EstadioResponse> findById(@PathVariable Integer id) {
+    public ResponseEntity<EstadioResponse> findById(@PathVariable Long id) {
         return ResponseEntity.ok(estadioService.findById(id));
     }
 

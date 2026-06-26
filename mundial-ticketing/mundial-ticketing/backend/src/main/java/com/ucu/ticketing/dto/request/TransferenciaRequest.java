@@ -11,7 +11,7 @@ import lombok.Data;
 public class TransferenciaRequest {
 
     @NotNull(message = "La entrada es obligatoria")
-    private Integer idEntrada;
+    private Long idEntrada;
 
     @NotBlank(message = "El mail destino es obligatorio")
     @Email(message = "El mail destino debe tener formato valido")

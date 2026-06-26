@@ -1,0 +1,113 @@
+.container {
+  padding: 2rem;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #1a1a2e;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.field {
+  margin-bottom: 1rem;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.submitButton {
+  width: 100%;
+  padding: 0.7rem;
+  background-color: #1a1a2e;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.submitButton:hover {
+  background-color: #0f0f1a;
+}
+
+.submitButton:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.error {
+  background-color: #fde2e2;
+  color: #c0392b;
+  padding: 0.6rem;
+  border-radius: 4px;
+  margin-bottom: 0.8rem;
+  font-size: 0.85rem;
+}
+
+.success {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 0.6rem;
+  border-radius: 4px;
+  margin-bottom: 0.8rem;
+  font-size: 0.85rem;
+}
+
+.vacio {
+  text-align: center;
+  color: #888;
+  padding: 1.5rem;
+}
+
+.listaTitle {
+  font-size: 1.1rem;
+  margin-bottom: 0.8rem;
+  color: #1a1a2e;
+}
+
+.funcionarioRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.badgeConDispositivo {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.badgeSinDispositivo {
+  background-color: #fff3cd;
+  color: #856404;
+}

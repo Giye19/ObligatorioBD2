@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Pais_Sede
 @Repository
 public class PaisSedeRepository {
 
@@ -18,22 +17,35 @@ public class PaisSedeRepository {
     }
 
     private final RowMapper<PaisSede> rowMapper = (rs, rowNum) -> {
-        PaisSede p = new PaisSede();
-        p.setNombrePais(rs.getString("nombre_pais"));
-        return p;
+        PaisSede ps = new PaisSede();
+        ps.setIdPaisSede(rs.getLong("Id_Pais_Sede"));
+        ps.setIdPais(rs.getLong("Id_Pais"));
+        ps.setNombrePais(rs.getString("Nombre_Pais"));
+        return ps;
     };
 
-    // devuelve todos los paises sede registrados
+    private static final String SELECT_BASE =
+            "select psede.Id_Pais_Sede, psede.Id_Pais, p.Nombre_Pais " +
+            "from Pais_Sede psede " +
+            "join Pais p on p.Id_Pais = psede.Id_Pais ";
+
     public List<PaisSede> findAll() {
-        String sql = "select * from Pais_Sede";
-        return jdbc.query(sql, rowMapper);
+        return jdbc.query(SELECT_BASE, rowMapper);
     }
 
-    // verifica si existe un pais sede con ese nombre
-    // se usa para validar referencias antes de insertar un estadio
+    public PaisSede findById(Long idPaisSede) {
+        String sql = SELECT_BASE + "where psede.Id_Pais_Sede = ?";
+        List<PaisSede> resultado = jdbc.query(sql, rowMapper, idPaisSede);
+        return resultado.isEmpty() ? null : resultado.get(0);
+    }
+
+    public PaisSede findByNombrePais(String nombrePais) {
+        String sql = SELECT_BASE + "where p.Nombre_Pais = ?";
+        List<PaisSede> resultado = jdbc.query(sql, rowMapper, nombrePais);
+        return resultado.isEmpty() ? null : resultado.get(0);
+    }
+
     public boolean existsByNombre(String nombrePais) {
-        String sql = "select count(*) from Pais_Sede where nombre_pais = ?";
-        Integer count = jdbc.queryForObject(sql, Integer.class, nombrePais);
-        return count != null && count > 0;
+        return findByNombrePais(nombrePais) != null;
     }
 }

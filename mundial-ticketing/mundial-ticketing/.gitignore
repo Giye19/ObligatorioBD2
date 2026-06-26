@@ -2,6 +2,12 @@
 backend/target/
 backend/*.jar
 
+# Credenciales y configuración sensible (por si se crean archivos locales)
+*.env
+mis-credenciales.ps1
+credenciales*.ps1
+application-local.properties
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
@@ -15,3 +21,6 @@ frontend/.env
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log

@@ -3,11 +3,14 @@ package com.ucu.ticketing.repository;
 import com.ucu.ticketing.model.Equipo;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.List;
 
-// maneja el acceso a datos de la tabla Equipo
 @Repository
 public class EquipoRepository {
 
@@ -19,28 +22,42 @@ public class EquipoRepository {
 
     private final RowMapper<Equipo> rowMapper = (rs, rowNum) -> {
         Equipo e = new Equipo();
-        e.setNombre(rs.getString("nombre"));
+        e.setIdEquipo(rs.getLong("Id_Equipo"));
+        e.setNombre(rs.getString("Nombre"));
         return e;
     };
 
-    // devuelve todos los equipos registrados, ordenados alfabeticamente
     public List<Equipo> findAll() {
-        String sql = "select * from Equipo order by nombre";
+        String sql = "select * from Equipo order by Nombre";
         return jdbc.query(sql, rowMapper);
     }
 
-    // verifica si existe un equipo con ese nombre
-    // se usa al crear un evento, para validar que los equipos
-    // local y visitante existan antes de vincularlos
-    public boolean existsByNombre(String nombre) {
-        String sql = "select count(*) from Equipo where nombre = ?";
-        Integer count = jdbc.queryForObject(sql, Integer.class, nombre);
-        return count != null && count > 0;
+    public Equipo findByNombre(String nombre) {
+        String sql = "select * from Equipo where Nombre = ?";
+        List<Equipo> resultado = jdbc.query(sql, rowMapper, nombre);
+        return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    // inserta un nuevo equipo
-    public void insert(String nombre) {
-        String sql = "insert into Equipo (nombre) values (?)";
-        jdbc.update(sql, nombre);
+    public Equipo findById(Long idEquipo) {
+        String sql = "select * from Equipo where Id_Equipo = ?";
+        List<Equipo> resultado = jdbc.query(sql, rowMapper, idEquipo);
+        return resultado.isEmpty() ? null : resultado.get(0);
+    }
+
+    public boolean existsByNombre(String nombre) {
+        return findByNombre(nombre) != null;
+    }
+
+    public Long insert(String nombre) {
+        String sql = "insert into Equipo (Nombre) values (?)";
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        jdbc.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, nombre);
+            return ps;
+        }, keyHolder);
+
+        return keyHolder.getKey().longValue();
     }
 }

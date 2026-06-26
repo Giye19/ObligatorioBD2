@@ -4,15 +4,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-import java.time.LocalDate;
-
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsuarioGeneral {
 
-    private String mail;
-    private LocalDate fechaRegistro;
-    private String estadoVerificacion; // PENDIENTE  VERIFICADO  RECHAZADO
+    private Long idUsuarioGeneral;
+    private Long idUsuario;
+    private LocalDateTime fechaRegistro;
+    private String estadoVerificacion;
 }

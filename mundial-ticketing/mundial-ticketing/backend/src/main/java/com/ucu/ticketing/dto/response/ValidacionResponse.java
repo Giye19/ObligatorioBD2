@@ -14,7 +14,7 @@ public class ValidacionResponse {
 
     private boolean accesoPermitido;
     private String mensaje;
-    private Integer idEntrada;
+    private Long idEntrada;
     private String letraSector;
     private String mailPropietario;
     private LocalDateTime horaIngreso;

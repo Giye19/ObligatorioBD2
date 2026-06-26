@@ -6,19 +6,15 @@ import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
-//tabla Transferencia
-//registra cada cambio de titularidad de una entrada
-//el cambio de propietario real (en Entrada.mailPropietario)
-//solo ocurre cuando estado pasa a ACEPTADA
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Transferencia {
 
-    private Integer idTransferencia;
-    private Integer idEntrada;
-    private String mailOrigen;
-    private String mailDestino;
+    private Long idTransferencia;
+    private Long idEntrada;
+    private Long idUsuarioOrigen;
+    private Long idUsuarioDestino;
     private LocalDateTime fechaTransferencia;
-    private String estado; // PENDIENTE  ACEPTADA  RECHAZADA
+    private String estadoTransferencia;
 }

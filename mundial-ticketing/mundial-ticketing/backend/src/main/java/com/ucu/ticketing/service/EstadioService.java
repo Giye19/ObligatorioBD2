@@ -5,56 +5,56 @@ import com.ucu.ticketing.dto.response.EstadioResponse;
 import com.ucu.ticketing.dto.response.SectorResponse;
 import com.ucu.ticketing.exception.BusinessException;
 import com.ucu.ticketing.model.Estadio;
+import com.ucu.ticketing.model.PaisSede;
 import com.ucu.ticketing.model.Sector;
+import com.ucu.ticketing.model.Usuario;
 import com.ucu.ticketing.repository.AdmPaisSedeRepository;
+import com.ucu.ticketing.repository.DireccionRepository;
 import com.ucu.ticketing.repository.EstadioRepository;
 import com.ucu.ticketing.repository.PaisSedeRepository;
 import com.ucu.ticketing.repository.SectorRepository;
+import com.ucu.ticketing.repository.UsuarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-// contiene la logica de gestion de estadios y sus sectores
-// solo un administrador puede crear estadios, y unicamente
-// dentro de su propio pais sede (jurisdiccion exclusiva)
 @Service
 public class EstadioService {
 
-    // letras de sector estandar que se crean automaticamente
-    // al dar de alta un nuevo estadio (segun la consigna: A, B, C, D)
     private static final String[] SECTORES_ESTANDAR = {"A", "B", "C", "D"};
-
-    // capacidad por defecto de cada sector al crearlo
-    // se puede ajustar despues con un endpoint propio si se necesita
     private static final int CAPACIDAD_DEFAULT = 10000;
 
     private final EstadioRepository estadioRepository;
     private final SectorRepository sectorRepository;
     private final PaisSedeRepository paisSedeRepository;
     private final AdmPaisSedeRepository admPaisSedeRepository;
+    private final DireccionRepository direccionRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public EstadioService(EstadioRepository estadioRepository,
                            SectorRepository sectorRepository,
                            PaisSedeRepository paisSedeRepository,
-                           AdmPaisSedeRepository admPaisSedeRepository) {
+                           AdmPaisSedeRepository admPaisSedeRepository,
+                           DireccionRepository direccionRepository,
+                           UsuarioRepository usuarioRepository) {
         this.estadioRepository = estadioRepository;
         this.sectorRepository = sectorRepository;
         this.paisSedeRepository = paisSedeRepository;
         this.admPaisSedeRepository = admPaisSedeRepository;
+        this.direccionRepository = direccionRepository;
+        this.usuarioRepository = usuarioRepository;
     }
 
-    // devuelve todos los estadios con sus sectores
     public List<EstadioResponse> findAll() {
         return estadioRepository.findAll().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
-    // devuelve un estadio especifico con sus sectores
-    // lanza error si no existe
-    public EstadioResponse findById(Integer idEstadio) {
+    public EstadioResponse findById(Long idEstadio) {
         Estadio estadio = estadioRepository.findById(idEstadio);
         if (estadio == null) {
             throw new BusinessException("El estadio no existe", HttpStatus.NOT_FOUND);
@@ -62,43 +62,41 @@ public class EstadioService {
         return toResponse(estadio);
     }
 
-    // crea un nuevo estadio con sus 4 sectores estandar
-    // solo el admin con jurisdiccion sobre ese pais puede hacerlo
+    @Transactional
     public EstadioResponse create(EstadioRequest request, String mailAdmin) {
 
-        // valida que el pais sede exista
-        if (!paisSedeRepository.existsByNombre(request.getNombrePais())) {
+        PaisSede paisSede = paisSedeRepository.findByNombrePais(request.getNombrePais());
+        if (paisSede == null) {
             throw new BusinessException("El pais sede no existe", HttpStatus.BAD_REQUEST);
         }
 
-        // valida que el admin tenga jurisdiccion sobre ese pais
+        Usuario usuarioAdmin = usuarioRepository.findByMail(mailAdmin);
+        if (usuarioAdmin == null) {
+            throw new BusinessException("El administrador no existe", HttpStatus.UNAUTHORIZED);
+        }
+
         boolean tieneJurisdiccion = admPaisSedeRepository.tieneJurisdiccion(
-                mailAdmin, request.getNombrePais());
+                usuarioAdmin.getIdUsuario(), paisSede.getIdPaisSede());
         if (!tieneJurisdiccion) {
             throw new BusinessException(
                     "No tiene jurisdiccion sobre el pais sede indicado", HttpStatus.FORBIDDEN);
         }
 
-        Estadio estadio = new Estadio();
-        estadio.setNombre(request.getNombre());
-        estadio.setNombrePais(request.getNombrePais());
+        Long idDireccion = direccionRepository.insert(
+                request.getDirPais(), request.getDirLocalidad(), request.getDirCalle(),
+                request.getDirNumero(), request.getDirCodPostal());
 
-        Integer idEstadio = estadioRepository.insert(estadio);
-        estadio.setIdEstadio(idEstadio);
+        Long idEstadio = estadioRepository.insert(
+                request.getNombre(), paisSede.getIdPaisSede(), idDireccion);
 
-        // crea los 4 sectores estandar con capacidad default
         for (String letra : SECTORES_ESTANDAR) {
-            Sector sector = new Sector();
-            sector.setIdEstadio(idEstadio);
-            sector.setLetra(letra);
-            sector.setCapacidad(CAPACIDAD_DEFAULT);
-            sectorRepository.insert(sector);
+            sectorRepository.insert(idEstadio, letra, CAPACIDAD_DEFAULT);
         }
 
+        Estadio estadio = estadioRepository.findById(idEstadio);
         return toResponse(estadio);
     }
 
-    // convierte el modelo interno a dto de salida, cargando sectores
     private EstadioResponse toResponse(Estadio estadio) {
         List<Sector> sectores = sectorRepository.findByEstadio(estadio.getIdEstadio());
 
@@ -108,7 +106,7 @@ public class EstadioService {
 
         return new EstadioResponse(
                 estadio.getIdEstadio(),
-                estadio.getNombre(),
+                estadio.getNombreEstadio(),
                 estadio.getNombrePais(),
                 sectoresResponse);
     }

@@ -135,14 +135,12 @@ export default function MisEntradas() {
                     </button>
                   )}
 
-                  {entrada.cantTransferencias < 3 && (
-                    <button
-                      className={styles.transferirButton}
-                      onClick={() => abrirModalTransferir(entrada.idEntrada)}
-                    >
-                      Transferir
-                    </button>
-                  )}
+                  <button
+                  className={styles.transferirButton}
+                  onClick={() => abrirModalTransferir(entrada.idEntrada)}
+                  >
+                    Transferir
+                  </button>
                 </>
               )}
             </div>

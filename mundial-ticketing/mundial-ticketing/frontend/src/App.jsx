@@ -12,7 +12,7 @@ import Estadios from './pages/admin/Estadios';
 import Eventos from './pages/admin/Eventos';
 import Reportes from './pages/admin/Reportes';
 import Escanear from './pages/funcionario/Escanear';
-
+import Dispositivos from './pages/admin/Dispositivos';
 
 
 function Placeholder({ texto }) {
@@ -92,7 +92,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/admin/dispositivos"
+          element={
+            <ProtectedRoute rolesPermitidos={['ADMIN']}>
+              <Dispositivos />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/funcionario/escanear"
           element={
