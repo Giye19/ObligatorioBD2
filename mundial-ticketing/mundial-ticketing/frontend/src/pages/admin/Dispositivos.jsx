@@ -9,6 +9,7 @@ export default function Dispositivos() {
   const [mailFuncionario, setMailFuncionario] = useState('');
   const [codigoDispositivo, setCodigoDispositivo] = useState('');
   const [idEvento, setIdEvento] = useState('');
+  const [sectoresSeleccionados, setSectoresSeleccionados] = useState([]);
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -42,23 +43,41 @@ export default function Dispositivos() {
       return;
     }
 
+    if (sectoresSeleccionados.length === 0) {
+      setError('Debe seleccionar al menos un sector');
+      return;
+    }
+
     setEnviando(true);
     try {
       await api.post('/dispositivos', {
         mailFuncionario,
         codigoDispositivo,
         idEvento: parseInt(idEvento, 10),
+        sectoresAsignados: sectoresSeleccionados,
       });
-      setExito('Dispositivo asignado correctamente, junto con los sectores del evento elegido');
+      setExito('Dispositivo asignado correctamente, con los sectores seleccionados');
       setMailFuncionario('');
       setCodigoDispositivo('');
       setIdEvento('');
+      setSectoresSeleccionados([]);
       cargarFuncionarios();
     } catch (err) {
       setError(err.response?.data?.message || 'Error al asignar el dispositivo');
     } finally {
       setEnviando(false);
     }
+  }
+
+  function toggleSector(letra) {
+    setSectoresSeleccionados((prev) =>
+      prev.includes(letra) ? prev.filter((l) => l !== letra) : [...prev, letra]
+    );
+  }
+
+  function handleEventoChange(valor) {
+    setIdEvento(valor);
+    setSectoresSeleccionados([]);
   }
 
   const funcionariosSinDispositivo = funcionarios.filter((f) => !f.tieneDispositivo);
@@ -97,8 +116,8 @@ export default function Dispositivos() {
         </div>
 
         <div className={styles.field}>
-          <label>Evento (se asigna a todos sus sectores)</label>
-          <select value={idEvento} onChange={(e) => setIdEvento(e.target.value)}>
+          <label>Evento</label>
+          <select value={idEvento} onChange={(e) => handleEventoChange(e.target.value)}>
             <option value="">Seleccionar...</option>
             {eventos.map((evento) => (
               <option key={evento.idEvento} value={evento.idEvento}>
@@ -107,6 +126,24 @@ export default function Dispositivos() {
             ))}
           </select>
         </div>
+
+        {idEvento && (
+          <div className={styles.field}>
+            <label>Sectores a asignar</label>
+            {eventos
+              .find((e) => e.idEvento === parseInt(idEvento, 10))
+              ?.sectoresHabilitados.map((sector) => (
+                <div key={sector.letraSector} className={styles.sectorCheckRow}>
+                  <input
+                    type="checkbox"
+                    checked={sectoresSeleccionados.includes(sector.letraSector)}
+                    onChange={() => toggleSector(sector.letraSector)}
+                  />
+                  <span>Sector {sector.letraSector}</span>
+                </div>
+              ))}
+          </div>
+        )}
 
         <button className={styles.submitButton} onClick={handleAsignar} disabled={enviando}>
           {enviando ? 'Asignando...' : 'Asignar dispositivo'}

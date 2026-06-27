@@ -9,7 +9,6 @@ export default function Estadios() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [nombre, setNombre] = useState('');
   const [nombrePais, setNombrePais] = useState('');
-  const [dirPais, setDirPais] = useState('');
   const [dirLocalidad, setDirLocalidad] = useState('');
   const [dirCalle, setDirCalle] = useState('');
   const [dirNumero, setDirNumero] = useState('');
@@ -39,7 +38,6 @@ export default function Estadios() {
   function abrirModal() {
     setNombre('');
     setNombrePais('');
-    setDirPais('');
     setDirLocalidad('');
     setDirCalle('');
     setDirNumero('');
@@ -54,7 +52,7 @@ export default function Estadios() {
       await api.post('/estadios', {
         nombre,
         nombrePais,
-        dirPais,
+        dirPais: nombrePais,
         dirLocalidad,
         dirCalle,
         dirNumero,
@@ -119,12 +117,6 @@ export default function Estadios() {
                 ))}
               </select>
             </div>
-
-            <div className={styles.field}>
-              <label>País (dirección)</label>
-              <input value={dirPais} onChange={(e) => setDirPais(e.target.value)} />
-            </div>
-
             <div className={styles.field}>
               <label>Localidad</label>
               <input value={dirLocalidad} onChange={(e) => setDirLocalidad(e.target.value)} />

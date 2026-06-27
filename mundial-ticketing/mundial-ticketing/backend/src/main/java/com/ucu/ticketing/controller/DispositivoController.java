@@ -42,6 +42,7 @@ public class DispositivoController {
         private String mailFuncionario;
         private String codigoDispositivo;
         private Long idEvento;
+        private List<String> sectoresAsignados;
     }
 
     @PostMapping
@@ -69,16 +70,29 @@ public class DispositivoController {
             throw new BusinessException("Debe indicar el evento a asignar", HttpStatus.BAD_REQUEST);
         }
 
+        if (request.getSectoresAsignados() == null || request.getSectoresAsignados().isEmpty()) {
+            throw new BusinessException("Debe seleccionar al menos un sector", HttpStatus.BAD_REQUEST);
+        }
+
         List<EventoSector> sectoresDelEvento = eventoSectorRepository.findByEvento(request.getIdEvento());
         if (sectoresDelEvento.isEmpty()) {
             throw new BusinessException(
                     "El evento indicado no tiene sectores habilitados", HttpStatus.BAD_REQUEST);
         }
 
+        List<EventoSector> sectoresAAsignar = sectoresDelEvento.stream()
+                .filter(es -> request.getSectoresAsignados().contains(es.getLetraSector()))
+                .toList();
+
+        if (sectoresAAsignar.isEmpty()) {
+            throw new BusinessException(
+                    "Ninguno de los sectores seleccionados pertenece a ese evento", HttpStatus.BAD_REQUEST);
+        }
+
         Long idDispositivo = dispositivoRepository.insert(
                 funcionario.getIdFuncionario(), request.getCodigoDispositivo());
 
-        for (EventoSector eventoSector : sectoresDelEvento) {
+        for (EventoSector eventoSector : sectoresAAsignar) {
             funcValidacionRepository.asignarSector(
                     funcionario.getIdFuncionario(), eventoSector.getIdEventoSector());
         }
