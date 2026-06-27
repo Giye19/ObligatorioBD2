@@ -23,15 +23,12 @@ export default function Estadios() {
   async function cargarEstadios() {
     setCargando(true);
     try {
-      const response = await api.get('/estadios');
-      setEstadios(response.data);
-
-      const paisesUnicos = [...new Set(response.data.map((e) => e.nombrePais))];
-      if (paisesUnicos.length === 0) {
-        setPaises(['USA', 'Canada', 'Mexico']);
-      } else {
-        setPaises(paisesUnicos);
-      }
+      const [resEstadios, resPaisesSede] = await Promise.all([
+        api.get('/estadios'),
+        api.get('/estadios/paises-sede'),
+      ]);
+      setEstadios(resEstadios.data);
+      setPaises(resPaisesSede.data.map((ps) => ps.nombrePais));
     } catch (err) {
       console.error(err);
     } finally {
