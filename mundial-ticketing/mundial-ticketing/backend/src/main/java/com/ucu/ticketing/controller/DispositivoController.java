@@ -2,9 +2,11 @@ package com.ucu.ticketing.controller;
 
 import com.ucu.ticketing.exception.BusinessException;
 import com.ucu.ticketing.model.Dispositivo;
+import com.ucu.ticketing.model.EventoSector;
 import com.ucu.ticketing.model.FuncValidacion;
 import com.ucu.ticketing.model.Usuario;
 import com.ucu.ticketing.repository.DispositivoRepository;
+import com.ucu.ticketing.repository.EventoSectorRepository;
 import com.ucu.ticketing.repository.FuncValidacionRepository;
 import com.ucu.ticketing.repository.UsuarioRepository;
 import lombok.Data;
@@ -14,6 +16,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/dispositivos")
 public class DispositivoController {
@@ -21,19 +25,23 @@ public class DispositivoController {
     private final DispositivoRepository dispositivoRepository;
     private final FuncValidacionRepository funcValidacionRepository;
     private final UsuarioRepository usuarioRepository;
+    private final EventoSectorRepository eventoSectorRepository;
 
     public DispositivoController(DispositivoRepository dispositivoRepository,
                                   FuncValidacionRepository funcValidacionRepository,
-                                  UsuarioRepository usuarioRepository) {
+                                  UsuarioRepository usuarioRepository,
+                                  EventoSectorRepository eventoSectorRepository) {
         this.dispositivoRepository = dispositivoRepository;
         this.funcValidacionRepository = funcValidacionRepository;
         this.usuarioRepository = usuarioRepository;
+        this.eventoSectorRepository = eventoSectorRepository;
     }
 
     @Data
     public static class DispositivoRequest {
         private String mailFuncionario;
         private String codigoDispositivo;
+        private Long idEvento;
     }
 
     @PostMapping
@@ -57,8 +65,23 @@ public class DispositivoController {
             throw new BusinessException("Ese funcionario ya tiene un dispositivo asignado", HttpStatus.CONFLICT);
         }
 
+        if (request.getIdEvento() == null) {
+            throw new BusinessException("Debe indicar el evento a asignar", HttpStatus.BAD_REQUEST);
+        }
+
+        List<EventoSector> sectoresDelEvento = eventoSectorRepository.findByEvento(request.getIdEvento());
+        if (sectoresDelEvento.isEmpty()) {
+            throw new BusinessException(
+                    "El evento indicado no tiene sectores habilitados", HttpStatus.BAD_REQUEST);
+        }
+
         Long idDispositivo = dispositivoRepository.insert(
                 funcionario.getIdFuncionario(), request.getCodigoDispositivo());
+
+        for (EventoSector eventoSector : sectoresDelEvento) {
+            funcValidacionRepository.asignarSector(
+                    funcionario.getIdFuncionario(), eventoSector.getIdEventoSector());
+        }
 
         Dispositivo dispositivo = new Dispositivo();
         dispositivo.setIdDispositivo(idDispositivo);

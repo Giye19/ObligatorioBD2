@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../../api/axiosConfig';
+import { useQrSession } from '../../context/QrSessionContext';
 import styles from './MisEntradas.module.css';
-
-const INTERVALO_QR_MS = 30000;
 
 function badgeClase(estado) {
   if (estado === 'ACTIVA') return styles.estadoActiva;
@@ -13,19 +12,14 @@ function badgeClase(estado) {
 export default function MisEntradas() {
   const [entradas, setEntradas] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [qrAbierto, setQrAbierto] = useState(null);
-  const [qrData, setQrData] = useState(null);
-  const [segundosRestantes, setSegundosRestantes] = useState(30);
   const [modalTransferir, setModalTransferir] = useState(null);
   const [mailDestino, setMailDestino] = useState('');
   const [errorTransferencia, setErrorTransferencia] = useState('');
 
-  const intervaloRef = useRef(null);
-  const cuentaAtrasRef = useRef(null);
+  const { entradaActiva, qrData, segundosRestantes, abrirQr, cerrarQr } = useQrSession();
 
   useEffect(() => {
     cargarEntradas();
-    return () => limpiarIntervalos();
   }, []);
 
   async function cargarEntradas() {
@@ -38,40 +32,6 @@ export default function MisEntradas() {
     } finally {
       setCargando(false);
     }
-  }
-
-  function limpiarIntervalos() {
-    if (intervaloRef.current) clearInterval(intervaloRef.current);
-    if (cuentaAtrasRef.current) clearInterval(cuentaAtrasRef.current);
-  }
-
-  async function abrirQr(idEntrada) {
-    limpiarIntervalos();
-    setQrAbierto(idEntrada);
-    await generarQr(idEntrada);
-
-    intervaloRef.current = setInterval(() => generarQr(idEntrada), INTERVALO_QR_MS);
-
-    setSegundosRestantes(30);
-    cuentaAtrasRef.current = setInterval(() => {
-      setSegundosRestantes((prev) => (prev > 0 ? prev - 1 : 30));
-    }, 1000);
-  }
-
-  async function generarQr(idEntrada) {
-    try {
-      const response = await api.post(`/validacion/qr/${idEntrada}/generar`);
-      setQrData(response.data);
-      setSegundosRestantes(30);
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  function cerrarQr() {
-    limpiarIntervalos();
-    setQrAbierto(null);
-    setQrData(null);
   }
 
   function abrirModalTransferir(idEntrada) {
@@ -121,7 +81,7 @@ export default function MisEntradas() {
 
               {entrada.estado !== 'CONSUMIDA' && (
                 <>
-                  {qrAbierto === entrada.idEntrada ? (
+                  {entradaActiva === entrada.idEntrada ? (
                     <div className={styles.qrContainer}>
                       <div className={styles.qrCode}>{qrData?.token}</div>
                       <div className={styles.qrTimer}>Se renueva en {segundosRestantes}s</div>
@@ -136,8 +96,8 @@ export default function MisEntradas() {
                   )}
 
                   <button
-                  className={styles.transferirButton}
-                  onClick={() => abrirModalTransferir(entrada.idEntrada)}
+                    className={styles.transferirButton}
+                    onClick={() => abrirModalTransferir(entrada.idEntrada)}
                   >
                     Transferir
                   </button>

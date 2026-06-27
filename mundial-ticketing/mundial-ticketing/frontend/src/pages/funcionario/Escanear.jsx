@@ -17,7 +17,7 @@ export default function Escanear() {
   async function cargarDispositivo() {
     try {
       const response = await api.get('/dispositivos/mi-dispositivo');
-      setIdDispositivo(response.data.idDispositivo);
+      setIdDispositivo(response.data.codigoDispositivo);
     } catch (err) {
       setErrorDispositivo('No tiene un dispositivo autorizado asignado. Contacte a un administrador.');
     }

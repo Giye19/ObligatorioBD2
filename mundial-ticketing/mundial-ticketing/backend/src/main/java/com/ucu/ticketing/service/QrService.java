@@ -12,15 +12,9 @@ import com.ucu.ticketing.repository.UsuarioGeneralRepository;
 import com.ucu.ticketing.repository.UsuarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Service
 public class QrService {
-
-    private static final int VIGENCIA_QR_SEGUNDOS = 30;
 
     private final QRRepository qrRepository;
     private final EntradaRepository entradaRepository;
@@ -37,66 +31,52 @@ public class QrService {
         this.usuarioGeneralRepository = usuarioGeneralRepository;
     }
 
-    @Transactional
-    public QrResponse generarNuevo(Long idEntrada, String mailSolicitante) {
+    /**
+     * abre (o reactiva) la sesion qr de una entrada, llamando al
+     * procedimiento sp_abrir_sesion_qr. el token real lo genera
+     * un trigger en la base al insertarse el qr por primera vez.
+     */
+    public QrResponse abrirSesion(Long idEntrada, String mailSolicitante) {
+        validarPropietario(idEntrada, mailSolicitante);
 
-        Long idUsuarioGeneral = resolverIdUsuarioGeneral(mailSolicitante);
-
-        Entrada entrada = entradaRepository.findById(idEntrada);
-        if (entrada == null) {
-            throw new BusinessException("La entrada no existe", HttpStatus.NOT_FOUND);
-        }
-
-        if (!entrada.getIdPropietarioActual().equals(idUsuarioGeneral)) {
+        QR qr = qrRepository.abrirSesion(idEntrada);
+        if (qr == null) {
             throw new BusinessException(
-                    "Solo el propietario actual puede generar el qr de esta entrada",
-                    HttpStatus.FORBIDDEN);
-        }
-
-        if ("CONSUMIDA".equals(entrada.getEstadoEntrada())) {
-            throw new BusinessException(
-                    "No se puede generar un qr para una entrada ya consumida", HttpStatus.CONFLICT);
-        }
-
-        String token = UUID.randomUUID().toString();
-
-        QR qr = new QR();
-        qr.setIdEntrada(idEntrada);
-        qr.setToken(token);
-        qr.setFechaExpiracion(LocalDateTime.now().plusSeconds(VIGENCIA_QR_SEGUNDOS));
-
-        Long idQr = qrRepository.insert(qr);
-        qr.setIdQr(idQr);
-
-        return new QrResponse(idQr, idEntrada, token, qr.getFechaExpiracion());
-    }
-
-    public QrResponse obtenerActivo(Long idEntrada, String mailSolicitante) {
-
-        Long idUsuarioGeneral = resolverIdUsuarioGeneral(mailSolicitante);
-
-        Entrada entrada = entradaRepository.findById(idEntrada);
-        if (entrada == null) {
-            throw new BusinessException("La entrada no existe", HttpStatus.NOT_FOUND);
-        }
-
-        if (!entrada.getIdPropietarioActual().equals(idUsuarioGeneral)) {
-            throw new BusinessException(
-                    "Solo el propietario actual puede consultar el qr de esta entrada",
-                    HttpStatus.FORBIDDEN);
-        }
-
-        QR qr = qrRepository.findUltimoGeneradoPorEntrada(idEntrada);
-        if (qr == null || qr.getFechaExpiracion().isBefore(LocalDateTime.now())) {
-            throw new BusinessException(
-                    "No hay un qr vigente, debe generar uno nuevo", HttpStatus.NOT_FOUND);
+                    "No se pudo abrir la sesión de QR", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         return new QrResponse(qr.getIdQr(), qr.getIdEntrada(), qr.getToken(), qr.getFechaExpiracion());
     }
 
-    private Long resolverIdUsuarioGeneral(String mail) {
-        Usuario usuario = usuarioRepository.findByMail(mail);
+    /**
+     * obtiene el qr vigente de una entrada, llamando al
+     * procedimiento sp_obtener_qr_actual. si el token vigente
+     * expiro, el procedimiento lo regenera antes de devolverlo.
+     * el cliente llama este metodo periodicamente (cada pocos
+     * segundos) mientras la pantalla de qr esta abierta.
+     */
+    public QrResponse obtenerActual(Long idEntrada, String mailSolicitante) {
+        validarPropietario(idEntrada, mailSolicitante);
+
+        QR qr = qrRepository.obtenerActual(idEntrada);
+        if (qr == null) {
+            throw new BusinessException(
+                    "No hay una sesión de QR abierta para esta entrada", HttpStatus.NOT_FOUND);
+        }
+
+        return new QrResponse(qr.getIdQr(), qr.getIdEntrada(), qr.getToken(), qr.getFechaExpiracion());
+    }
+
+    /**
+     * cierra la sesion qr de una entrada, por ejemplo cuando el
+     * usuario sale de la pantalla de qr
+     */
+    public void cerrarSesion(Long idQr, String mailSolicitante) {
+        qrRepository.cerrarSesion(idQr);
+    }
+
+    private void validarPropietario(Long idEntrada, String mailSolicitante) {
+        Usuario usuario = usuarioRepository.findByMail(mailSolicitante);
         if (usuario == null) {
             throw new BusinessException("El usuario no existe", HttpStatus.UNAUTHORIZED);
         }
@@ -106,6 +86,15 @@ public class QrService {
             throw new BusinessException("El usuario no es un usuario general", HttpStatus.FORBIDDEN);
         }
 
-        return usuarioGeneral.getIdUsuarioGeneral();
+        Entrada entrada = entradaRepository.findById(idEntrada);
+        if (entrada == null) {
+            throw new BusinessException("La entrada no existe", HttpStatus.NOT_FOUND);
+        }
+
+        if (!entrada.getIdPropietarioActual().equals(usuarioGeneral.getIdUsuarioGeneral())) {
+            throw new BusinessException(
+                    "Solo el propietario actual puede acceder al QR de esta entrada",
+                    HttpStatus.FORBIDDEN);
+        }
     }
 }

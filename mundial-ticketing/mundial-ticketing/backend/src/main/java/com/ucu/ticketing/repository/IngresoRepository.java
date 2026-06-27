@@ -3,12 +3,8 @@ package com.ucu.ticketing.repository;
 import com.ucu.ticketing.model.Ingreso;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
-import java.sql.Statement;
 import java.util.List;
 
 @Repository
@@ -31,29 +27,22 @@ public class IngresoRepository {
         return i;
     };
 
+    /**
+     * busca el registro de validacion asociado a un qr, si existe.
+     * util para confirmar que una validacion efectivamente quedo
+     * registrada despues de llamar a sp_validar_qr
+     */
     public Ingreso findByIdQr(Long idQr) {
         String sql = "select * from Validacion where Id_QR = ?";
         List<Ingreso> resultado = jdbc.query(sql, rowMapper, idQr);
         return resultado.isEmpty() ? null : resultado.get(0);
     }
 
-    public Long insert(Ingreso ingreso) {
-        String sql = "insert into Validacion (Id_QR, Id_Dispositivo, Id_Funcionario, Puerta_Ingreso) " +
-                     "values (?, ?, ?, ?)";
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-
-        jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setLong(1, ingreso.getIdQr());
-            ps.setLong(2, ingreso.getIdDispositivo());
-            ps.setLong(3, ingreso.getIdFuncionario());
-            ps.setString(4, ingreso.getPuertaIngreso());
-            return ps;
-        }, keyHolder);
-
-        return keyHolder.getKey().longValue();
-    }
-
+    /**
+     * lista los sectores (evento_sector) donde un funcionario ya
+     * validó entradas dentro de un evento especifico. se usa para 
+     * comparar contra sus sectores asignados
+     */
     public List<Long> findSectoresValidadosPorFuncionario(Long idFuncionario, Long idEvento) {
         String sql = "select distinct es.Id_Evento_Sector " +
                      "from Validacion v " +

@@ -4,9 +4,11 @@ import styles from './Dispositivos.module.css';
 
 export default function Dispositivos() {
   const [funcionarios, setFuncionarios] = useState([]);
+  const [eventos, setEventos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mailFuncionario, setMailFuncionario] = useState('');
   const [codigoDispositivo, setCodigoDispositivo] = useState('');
+  const [idEvento, setIdEvento] = useState('');
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -18,8 +20,12 @@ export default function Dispositivos() {
   async function cargarFuncionarios() {
     setCargando(true);
     try {
-      const response = await api.get('/dispositivos/funcionarios-disponibles');
-      setFuncionarios(response.data);
+      const [resFuncionarios, resEventos] = await Promise.all([
+        api.get('/dispositivos/funcionarios-disponibles'),
+        api.get('/eventos'),
+      ]);
+      setFuncionarios(resFuncionarios.data);
+      setEventos(resEventos.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -31,17 +37,22 @@ export default function Dispositivos() {
     setError('');
     setExito('');
 
-    if (!mailFuncionario || !codigoDispositivo) {
-      setError('Debe seleccionar un funcionario y un código de dispositivo');
+    if (!mailFuncionario || !codigoDispositivo || !idEvento) {
+      setError('Debe seleccionar un funcionario, un evento y un código de dispositivo');
       return;
     }
 
     setEnviando(true);
     try {
-      await api.post('/dispositivos', { mailFuncionario, codigoDispositivo });
-      setExito('Dispositivo asignado correctamente');
+      await api.post('/dispositivos', {
+        mailFuncionario,
+        codigoDispositivo,
+        idEvento: parseInt(idEvento, 10),
+      });
+      setExito('Dispositivo asignado correctamente, junto con los sectores del evento elegido');
       setMailFuncionario('');
       setCodigoDispositivo('');
+      setIdEvento('');
       cargarFuncionarios();
     } catch (err) {
       setError(err.response?.data?.message || 'Error al asignar el dispositivo');
@@ -83,6 +94,18 @@ export default function Dispositivos() {
             onChange={(e) => setCodigoDispositivo(e.target.value)}
             placeholder="DISP-001"
           />
+        </div>
+
+        <div className={styles.field}>
+          <label>Evento (se asigna a todos sus sectores)</label>
+          <select value={idEvento} onChange={(e) => setIdEvento(e.target.value)}>
+            <option value="">Seleccionar...</option>
+            {eventos.map((evento) => (
+              <option key={evento.idEvento} value={evento.idEvento}>
+                {evento.equipoLocal} vs {evento.equipoVisitante} — {evento.fechaEvento}
+              </option>
+            ))}
+          </select>
         </div>
 
         <button className={styles.submitButton} onClick={handleAsignar} disabled={enviando}>

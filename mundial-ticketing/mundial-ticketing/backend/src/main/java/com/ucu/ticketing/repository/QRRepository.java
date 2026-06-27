@@ -3,22 +3,33 @@ package com.ucu.ticketing.repository;
 import com.ucu.ticketing.model.QR;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.Types;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public class QRRepository {
 
     private final JdbcTemplate jdbc;
+    private final SimpleJdbcCall callAbrirSesion;
+    private final SimpleJdbcCall callObtenerQrActual;
+    private final SimpleJdbcCall callValidarQr;
 
     public QRRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+
+        this.callAbrirSesion = new SimpleJdbcCall(jdbc)
+                .withProcedureName("sp_abrir_sesion_qr");
+
+        this.callObtenerQrActual = new SimpleJdbcCall(jdbc)
+                .withProcedureName("sp_obtener_qr_actual");
+
+        this.callValidarQr = new SimpleJdbcCall(jdbc)
+                .withProcedureName("sp_validar_qr");
     }
 
     private final RowMapper<QR> rowMapper = (rs, rowNum) -> {
@@ -32,40 +43,73 @@ public class QRRepository {
     };
 
     /**
-     * devuelve el ultimo qr generado para una entrada, sin importar
-     * si esta vencido o no (esa validacion la hace el service).
-     * como la tabla no tiene columna "activo", el ultimo generado
-     * por fecha es, por definicion, el unico que tiene sentido usar
+     * llama a sp_abrir_sesion_qr, que crea el qr si no existe
+     * (el trigger trg_qr_generar_token_insert genera el token real)
+     * y abre o reactiva la sesion qr activa. devuelve el qr vigente.
      */
-    public QR findUltimoGeneradoPorEntrada(Long idEntrada) {
-        String sql = "select * from QR where Id_Entrada = ? order by Fecha_Generacion desc limit 1";
-        List<QR> resultado = jdbc.query(sql, rowMapper, idEntrada);
-        return resultado.isEmpty() ? null : resultado.get(0);
+    public QR abrirSesion(Long idEntrada) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("p_id_entrada", idEntrada);
+
+        Map<String, Object> resultado = callAbrirSesion.execute(params);
+        return extraerPrimerQr(resultado);
     }
 
-    public QR findByToken(String token) {
-        String sql = "select * from QR where Token = ?";
-        List<QR> resultado = jdbc.query(sql, rowMapper, token);
-        return resultado.isEmpty() ? null : resultado.get(0);
+    /**
+     * llama a sp_obtener_qr_actual. si el token vigente expiro,
+     * el procedimiento lo regenera antes de devolverlo.
+     * se llama periodicamente desde el cliente cada pocos segundos.
+     */
+    public QR obtenerActual(Long idEntrada) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("p_id_entrada", idEntrada);
+
+        Map<String, Object> resultado = callObtenerQrActual.execute(params);
+        return extraerPrimerQr(resultado);
     }
 
-    public List<QR> findHistorialByEntrada(Long idEntrada) {
-        String sql = "select * from QR where Id_Entrada = ? order by Fecha_Generacion asc";
-        return jdbc.query(sql, rowMapper, idEntrada);
+    /**
+     * llama a sp_cerrar_sesion_qr directamente con jdbc, ya que
+     * no devuelve resultset (solo hace un update interno)
+     */
+    public void cerrarSesion(Long idQr) {
+        jdbc.update("CALL sp_cerrar_sesion_qr(?)", idQr);
     }
 
-    public Long insert(QR qr) {
-        String sql = "insert into QR (Id_Entrada, Token, Fecha_Expiracion) values (?, ?, ?)";
-        KeyHolder keyHolder = new GeneratedKeyHolder();
+    /**
+     * llama a sp_validar_qr, que hace toda la validacion de acceso
+     * (dispositivo autorizado, qr vigente, funcionario asignado al
+     * sector) y registra la validacion en una sola operacion atomica
+     */
+    public void validarQr(String tokenLeido, Long idDispositivo, String puertaIngreso) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("p_token_leido", tokenLeido);
+        params.put("p_id_dispositivo", idDispositivo);
+        params.put("p_puerta_ingreso", puertaIngreso);
 
-        jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setLong(1, qr.getIdEntrada());
-            ps.setString(2, qr.getToken());
-            ps.setTimestamp(3, Timestamp.valueOf(qr.getFechaExpiracion()));
-            return ps;
-        }, keyHolder);
+        callValidarQr.execute(params);
+    }
 
-        return keyHolder.getKey().longValue();
+    @SuppressWarnings("unchecked")
+    private QR extraerPrimerQr(Map<String, Object> resultadoProcedure) {
+        for (Object valor : resultadoProcedure.values()) {
+            if (valor instanceof List<?> lista && !lista.isEmpty()) {
+                Object primeraFila = lista.get(0);
+                if (primeraFila instanceof Map<?, ?> fila) {
+                    return mapearDesdeMap((Map<String, Object>) fila);
+                }
+            }
+        }
+        return null;
+    }
+
+    private QR mapearDesdeMap(Map<String, Object> fila) {
+        QR qr = new QR();
+        qr.setIdQr(((Number) fila.get("Id_QR")).longValue());
+        qr.setIdEntrada(((Number) fila.get("Id_Entrada")).longValue());
+        qr.setToken((String) fila.get("Token"));
+        qr.setFechaGeneracion(((java.sql.Timestamp) fila.get("Fecha_Generacion")).toLocalDateTime());
+        qr.setFechaExpiracion(((java.sql.Timestamp) fila.get("Fecha_Expiracion")).toLocalDateTime());
+        return qr;
     }
 }
