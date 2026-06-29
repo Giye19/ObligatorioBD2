@@ -18,7 +18,7 @@ logs/
 
 # Variables de entorno / secretos
 application-prod.properties
-application.properties
+application-local.properties
 .env
 
 # OS
