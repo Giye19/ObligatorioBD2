@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axiosConfig';
 import styles from './Login.module.css';
 
 export default function Register() {
@@ -17,12 +18,26 @@ export default function Register() {
     dirCodPostal: '',
   });
 
+  const [paises, setPaises] = useState([]);
   const [telefonos, setTelefonos] = useState(['']);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    cargarPaises();
+  }, []);
+
+  async function cargarPaises() {
+    try {
+      const response = await api.get('/paises');
+      setPaises(response.data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -87,11 +102,21 @@ export default function Register() {
           <div className={styles.row}>
             <div className={styles.field}>
               <label htmlFor="docPais">País documento</label>
-              <input id="docPais" name="docPais" value={form.docPais} onChange={handleChange} required />
+              <select id="docPais" name="docPais" value={form.docPais} onChange={handleChange} required>
+                <option value="">Seleccionar...</option>
+                {paises.map((p) => (
+                  <option key={p.idPais} value={p.nombrePais}>{p.nombrePais}</option>
+                ))}
+              </select>
             </div>
             <div className={styles.field}>
               <label htmlFor="docTipo">Tipo documento</label>
-              <input id="docTipo" name="docTipo" value={form.docTipo} onChange={handleChange} placeholder="CI, Pasaporte..." required />
+              <select id="docTipo" name="docTipo" value={form.docTipo} onChange={handleChange} required>
+                <option value="">Seleccionar...</option>
+                <option value="CI">CI</option>
+                <option value="PASAPORTE">Pasaporte</option>
+                <option value="OTRO">Otro</option>
+              </select>
             </div>
           </div>
 
@@ -103,7 +128,12 @@ export default function Register() {
           <div className={styles.row}>
             <div className={styles.field}>
               <label htmlFor="dirPais">País</label>
-              <input id="dirPais" name="dirPais" value={form.dirPais} onChange={handleChange} required />
+              <select id="dirPais" name="dirPais" value={form.dirPais} onChange={handleChange} required>
+                <option value="">Seleccionar...</option>
+                {paises.map((p) => (
+                  <option key={p.idPais} value={p.nombrePais}>{p.nombrePais}</option>
+                ))}
+              </select>
             </div>
             <div className={styles.field}>
               <label htmlFor="dirLocalidad">Localidad</label>

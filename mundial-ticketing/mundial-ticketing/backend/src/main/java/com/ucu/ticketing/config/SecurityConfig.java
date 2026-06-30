@@ -44,6 +44,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Rutas públicas: registro y login
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/paises/**").permitAll()
                 // Swagger/OpenAPI si se agrega a futuro
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                 // Todo lo demás requiere autenticación
